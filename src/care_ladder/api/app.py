@@ -308,6 +308,24 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
     static_dir = Path(__file__).resolve().parent / "static"
     application.mount("/ui", StaticFiles(directory=static_dir, html=True), name="ui")
 
+    @application.get("/plan")
+    def get_plan() -> dict[str, Any]:
+        """Current demo care plan (phone numbers redacted) for the console's
+        full-ladder rail: shows never-reached rungs (e.g. emergency fail-closed)."""
+        plan = load_care_plan(_DEMO_PLAN_PATH)
+
+        def _redact(phone: str | None) -> str | None:
+            if not phone:
+                return phone
+            return f"****{phone[-2:]}" if len(phone) >= 2 else "****"
+
+        data = plan.model_dump()
+        for key in ("caregiver", "secondary", "monitored"):
+            contact = data.get(key)
+            if contact and contact.get("phone_e164"):
+                contact["phone_e164"] = _redact(contact["phone_e164"])
+        return data
+
     @application.get("/incidents")
     def list_incidents() -> list[dict[str, Any]]:
         return [_incident_summary(i) for i in application.state.store.list_incidents()]
