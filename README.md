@@ -125,12 +125,11 @@ See `configs/demo_home.yaml`. Emergency rung is **disabled by default** (fail-cl
 
 E2E demo path: `tests/test_e2e_demo.py` (fixture → incident has ≥3 audit events).
 
-## AWS deployment sketch (OpenCV / AWS meaningful component)
+## AWS deployment (live)
 
-Live AWS deploy is **not** required for the judge demo. For the competition’s AWS path see:
+**Live demo (verified):** https://d2u7pls4da2poz.cloudfront.net/ui/ - CloudFront HTTPS -> ALB -> ECS Fargate (X86_64), DynamoDB incident store, S3 silhouette clips, EventBridge cue bus with a CloudWatch archive rule. CI on every push runs the test suite + real-footage evaluation, builds the amd64 image, pushes to ECR, re-registers the task definition, and rolls the service - a push to `main` is a verified deploy (`scripts/infra.sh` replays the provisioning). Local run via `./scripts/run_demo.sh` needs no AWS credentials.
 
-- [`infra/README.md`](infra/README.md) - S3 (blurred/silhouette clips only), ECS/Fargate service, EventBridge cue bus; how this meets the “meaningful AWS” bar
-- [`infra/ecs-task-outline.md`](infra/ecs-task-outline.md) - task/service outline (not live IaC)
+- [`infra/README.md`](infra/README.md) - architecture and how this meets the "meaningful AWS" bar
+- [`infra/ecs-task-outline.md`](infra/ecs-task-outline.md) - task/service outline
 - Root [`Dockerfile`](Dockerfile) - builds a runnable API image (`uvicorn care_ladder.api.app:app`)
 
-The OpenCV/AWS compute grant proposal was submitted separately; this repo only sketches the same architecture. Do not assume a public URL unless you have actually deployed.
