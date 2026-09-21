@@ -21,7 +21,7 @@ from care_ladder.channels.dial import StubDialer
 from care_ladder.cloud.sinks import CloudSinks
 from care_ladder.channels.speaker import SpeakerSimulator
 from care_ladder.ladder.orchestrator import run_incident
-from care_ladder.models import CueEvent
+from care_ladder.models import AuditEvent, CueEvent
 from care_ladder.plan_loader import load_care_plan
 from care_ladder.vision.cues import CueDetector
 from care_ladder.vision.ingest import ingest_video, save_upload
@@ -337,6 +337,36 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="incident not found")
         # Full timeline JSON: ordered audit events (cue → tools → resolve/jump).
         return incident.model_dump()
+
+    @application.post("/incidents/{incident_id}/ack")
+    def ack_incident(incident_id: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Caregiver acknowledgement: a human confirmed they saw this incident.
+
+        Appends a ``caregiver_ack`` audit event and stamps ``acked_by``/
+        ``acked_at``. Status is unchanged (resolved stays resolved) - the ack
+        is the human-side close of the loop; the orchestrator consults it for
+        re-dial cooldown on subsequent cues.
+        """
+        incident = application.state.store.get(incident_id)
+        if incident is None:
+            raise HTTPException(status_code=404, detail="incident not found")
+        if incident.acked_by is not None:
+            raise HTTPException(status_code=409, detail="incident already acknowledged")
+        body = body or {}
+        contact = str(body.get("contact", "caregiver"))
+        note = str(body.get("note") or "")[:200]
+        now = datetime.now(timezone.utc)
+        incident.acked_by = contact
+        incident.acked_at = now
+        incident.events.append(
+            AuditEvent(
+                tool="notify",
+                cue_kind=incident.cue.kind,
+                detail={"action": "caregiver_ack", "contact": contact, "note": note},
+            )
+        )
+        application.state.store.save(incident)
+        return {"incident_id": incident.id, "acked_by": contact, "acked_at": now.isoformat()}
 
     @application.get("/incidents/{incident_id}/frames/{index}", response_class=Response)
     def get_incident_frame(incident_id: str, index: int):

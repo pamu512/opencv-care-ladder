@@ -27,7 +27,11 @@ ADD https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/pose
 
 # Editable install keeps package paths under /app/src so api.app resolves
 # configs/demo_home.yaml via Path(__file__).parents[3] / "configs".
-RUN pip install --no-cache-dir -e .
+# requirements-lock.txt pins the exact, CI-verified versions for reproducible
+# image builds (opencv wheel is the heavy layer; cache busts only on lock change).
+COPY requirements-lock.txt /tmp/requirements-lock.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-lock.txt
+RUN pip install --no-cache-dir --no-deps -e .
 
 ENV HOST=0.0.0.0 \
     PORT=8000 \

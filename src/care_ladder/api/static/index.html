@@ -748,6 +748,9 @@ function renderIncident(inc, frames){
       <span class="inc-meta">
         <span>household ${esc(inc.household_id)}</span>
         <a class="trace-link" href="/incidents/${esc(inc.id)}" target="_blank" rel="noopener">${icon("i-code")}raw trace</a>
+        ${inc.acked_by
+          ? `<span class="pill p-resolved" title="Acknowledged by ${esc(inc.acked_by)}">${icon("i-check")}acked</span>`
+          : `<button class="btn" type="button" data-ack="${esc(inc.id)}" title="Confirm you have seen this incident">${icon("i-check")}Acknowledge</button>`}
         <button class="iconbtn" type="button" data-focus aria-label="Focus this incident" title="Focus">${icon("i-expand")}</button>
       </span>
     </div>
@@ -799,6 +802,21 @@ function bindCard(root){
     ol.style.display=expanded?"none":"";
     expanded?state.expanded.delete(id):state.expanded.add(id);
   });
+  // caregiver acknowledge
+  root.querySelector("[data-ack]")?.addEventListener("click",async (e)=>{
+    const btn=e.currentTarget;
+    btn.disabled=true;
+    try{
+      const r=await fetch(`/incidents/${btn.dataset.ack}/ack`,{method:"POST",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({contact:"caregiver"})});
+      if(!r.ok){ const b=await r.json().catch(()=>({}));
+        $("#announcer").textContent=`Ack failed: ${b.detail||r.statusText}`; btn.disabled=false; return; }
+      $("#announcer").textContent="Incident acknowledged - recorded in the audit trail.";
+      await refresh();
+    }catch(err){ $("#announcer").textContent=`Ack failed: ${err.message}`; btn.disabled=false; }
+  });
+
   // focus mode
   root.querySelector("[data-focus]")?.addEventListener("click",()=>{
     document.querySelectorAll("article.incident").forEach(a=>a.classList.toggle("focused",a===root));

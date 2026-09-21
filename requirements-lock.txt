@@ -1,0 +1,9 @@
+boto3==1.43.94
+fastapi==0.141.1
+httpx2==2.13.0
+opencv-python==5.0.0.93
+pydantic==2.13.5
+pytest==9.1.1
+python-multipart==0.0.32
+pyyaml==6.0.3
+uvicorn==0.53.0

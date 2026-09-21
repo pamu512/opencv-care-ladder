@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -86,3 +87,8 @@ class Incident(BaseModel):
     status: IncidentStatus = "open"
     pre_event_frame_count: int = 0
     privacy: PrivacyMode | None = None
+    # Caregiver acknowledgement (human-in-the-loop): set when a caregiver
+    # confirms they have seen the incident. Acks never change status; they
+    # gate re-dial cooldowns in the orchestrator.
+    acked_by: str | None = None
+    acked_at: datetime | None = None
