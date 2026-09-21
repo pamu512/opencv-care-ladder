@@ -2,7 +2,10 @@
 
 Judging weights: Technical 30 · Innovation 20 · Impact 20 · UX 10 · Docs 10 · Cloud/responsible ops 10.
 Setup before recording: `./scripts/run_demo.sh` (or the live AWS URL), `/ui/` open in a browser tab,
-`configs/demo_home.yaml` open in an editor tab. Two terminal tabs: one for curl, one for the UI.
+`configs/demo_home.yaml` open in an editor tab. The console is v2: every incident card leads with a
+plain-language **verdict line** ("why did this escalate") and an **escalation-ladder rail** with per-rung
+states; the audit timeline opens by default on the newest incident. Two new beats: caregiver
+**Acknowledge** button (human-in-the-loop) and the **annotated detection frame** in the telemetry panel.
 
 | Time | Section | On screen | Say / show |
 | --- | --- | --- | --- |

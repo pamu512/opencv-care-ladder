@@ -26,6 +26,12 @@ Word-for-word VO in the right column - read it verbatim or paraphrase lightly; i
 | 9 | 4:20–4:45 | `docs/agentic-workflow.html` diagram (or architecture section of README); optional quick CloudWatch/EventBridge console peek | "The whole stack runs on AWS: Fargate behind CloudFront, DynamoDB for the incident record, S3 for the privacy-filtered clips - silhouette only - and every cue published to EventBridge, with an archive rule so cues are deliverable events, not log lines. GitHub Actions runs the tests, the real-footage evaluation, builds the image, and deploys - a push to main is a verified deploy. And the honest parts are written down: no medical claims, no real telephony, failure modes documented." |
 | 10 | 4:45–5:00 | README / repo root; end card with repo URL + live demo URL | "Care Ladder: OpenCV five sees, the ladder decides, and every step is on the record. Confirm before you escalate." |
 
+## Console v2 additions (record these beats)
+
+- After Path B resolves, click **Acknowledge** on the incident card: the button flips to an "acked" pill and a `caregiver_ack` event lands in the timeline. VO: "The loop closes with a human: the caregiver acknowledges, and that acknowledgement is part of the audit trail - not a silent read receipt."
+- In the DNN/privacy beat, point at the **detection frame** (telemetry panel): the annotated box + numbers ARE the "why this cue fired" answer, privacy-transformed.
+- The ladder rail now shows never-reached rungs (via GET /plan) - end on "Emergency, fail-closed, never reached" for the responsibility beat.
+
 ## Cut-in cheatsheet (edit-time saves)
 
 - The fall analysis takes minutes in real time - **never show it wall-clock**. Cut from "upload started" (progress bar visible) straight to the pre-seeded completed incident.
