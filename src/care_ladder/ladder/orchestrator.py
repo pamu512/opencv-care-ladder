@@ -123,6 +123,46 @@ def _apply_privacy(
     return transformed, mode, len(transformed)
 
 
+def _annotate_detection_frame(frame, cue) -> "np.ndarray | None":
+    """Draw the detector's view: bounding box (if carried in cue.detail) plus
+    key telemetry, so the console can show WHY the cue fired."""
+    if frame is None or cue is None:
+        return None
+    import cv2
+
+    out = frame.copy()
+    d = cue.detail or {}
+    h = out.shape[0]
+    # bbox fields written by CueDetector for DNN/blob paths
+    box = d.get("bbox") or d.get("box")
+    if isinstance(box, (list, tuple)) and len(box) == 4:
+        x, y, w, hh = [int(v) for v in box]
+        cv2.rectangle(out, (x, y), (x + w, y + hh), (66, 215, 255), 2)
+    lines = [cue.kind]
+    if d.get("confidence") is not None:
+        lines.append(f"conf {d['confidence']}")
+    if d.get("motion_mean") is not None:
+        lines.append(f"motion {d['motion_mean']}")
+    pose = d.get("pose")
+    if isinstance(pose, dict):
+        if pose.get("torso_angle_deg") is not None:
+            lines.append(f"torso {pose['torso_angle_deg']}")
+        if pose.get("hip_y_ratio") is not None:
+            lines.append(f"hip {pose['hip_y_ratio']}")
+    if d.get("torso_angle_deg") is not None:
+        lines.append(f"torso {d['torso_angle_deg']}")
+    if d.get("hip_y_ratio") is not None:
+        lines.append(f"hip {d['hip_y_ratio']}")
+    if d.get("pattern"):
+        lines.append(str(d["pattern"]))
+    y0 = 20
+    for ln in lines[:5]:
+        cv2.putText(out, ln, (10, y0), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
+                    (66, 215, 255), 1, cv2.LINE_AA)
+        y0 += 18
+    return out
+
+
 async def run_incident(
     cue: CueEvent,
     plan: CarePlan,
@@ -147,9 +187,15 @@ async def run_incident(
 
     Pre-event frames are privacy-transformed (default blur) before attach count.
     """
-    private_frames, privacy, frame_count = _apply_privacy(
-        list(pre_event_frames or []), privacy_mode
-    )
+    frames_in = list(pre_event_frames or [])
+    # Detection frame (P1.1): annotate the cue's box/telemetry on a copy of the
+    # raw frame, THEN privacy-transform it like every other frame - judges see
+    # what the detector saw (bbox + numbers) without identifying pixels.
+    detection_frame = _annotate_detection_frame(frames_in[-1] if frames_in else None, cue)
+    if detection_frame is not None:
+        detection_frame, _, _ = _apply_privacy([detection_frame], privacy_mode)
+
+    private_frames, privacy, frame_count = _apply_privacy(frames_in, privacy_mode)
     # Refuse non-zero attach without a privacy transform flag.
     if frame_count > 0 and privacy not in {"blur", "silhouette"}:
         private_frames, privacy, frame_count = [], None, 0
@@ -166,6 +212,9 @@ async def run_incident(
     # Keep transformed frames available to callers that need a clip snapshot
     # without serializing numpy into the pydantic model / JSON timeline.
     incident.__dict__["_private_pre_event_frames"] = private_frames
+    incident.__dict__["_private_detection_frame"] = (
+        detection_frame[0] if detection_frame else None
+    )
 
     events = incident.events
     cue_detail: dict[str, Any] = {

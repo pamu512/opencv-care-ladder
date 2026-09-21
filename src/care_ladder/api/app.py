@@ -389,6 +389,21 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
             raise HTTPException(status_code=500, detail="png encode failed")
         return Response(content=buf.tobytes(), media_type="image/png")
 
+    @application.get("/incidents/{incident_id}/detection_frame", response_class=Response)
+    def get_detection_frame(incident_id: str):
+        """The frame the detector saw at cue time, annotated (bbox + telemetry)
+        and privacy-transformed. Answers 'why did this cue fire' visually."""
+        incident = application.state.store.get(incident_id)
+        if incident is None:
+            raise HTTPException(status_code=404, detail="incident not found")
+        frame = incident.__dict__.get("_private_detection_frame")
+        if frame is None:
+            raise HTTPException(status_code=404, detail="no detection frame for this incident")
+        ok, buf = cv2.imencode(".png", frame)
+        if not ok:
+            raise HTTPException(status_code=500, detail="png encode failed")
+        return Response(content=buf.tobytes(), media_type="image/png")
+
     @application.get("/incidents/{incident_id}/frames")
     def list_incident_frames(incident_id: str) -> dict[str, Any]:
         incident = application.state.store.get(incident_id)
@@ -523,6 +538,69 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
         )
         asyncio.run(_publish_cloud(incident))
         return incident.id
+
+    @application.post("/demo/camera/start")
+    async def camera_start(body: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Live camera demo: open a device index or RTSP/HTTP URL, run the same
+        CueDetector at ~5 Hz, auto-create an incident on the first cue.
+
+        Guardrails: demo plan only, hard 10-minute cap, one session per process,
+        privacy transform before persist. A visible "LIVE" banner is shown in
+        the console while a session runs.
+        """
+        from care_ladder.vision import camera as cam
+
+        body = body or {}
+        source = body.get("source", 0)
+        if isinstance(source, str) and not source.startswith(("rtsp://", "http://", "https://")):
+            raise HTTPException(status_code=400, detail="source must be a device index or rtsp/http URL")
+
+        plan = load_care_plan(_DEMO_PLAN_PATH)
+        plan.triggers.no_movement.timeout_sec = min(plan.triggers.no_movement.timeout_sec, 30)
+        detector = CueDetector.from_plan(plan, zone_id="living_room")
+        if _MODEL_PATH.exists():
+            from care_ladder.vision.mppersondet import MPPersonDet
+
+            detector.person_detector = MPPersonDet(str(_MODEL_PATH), scoreThreshold=0.3)
+
+        async def _on_cue(cue, t: float):
+            speaker = SpeakerSimulator(scripted=[])
+            dialer = StubDialer(behavior={"caregiver": "no_answer", "secondary": "answered"})
+            incident = await run_incident(
+                cue=cue,
+                plan=plan,
+                speaker=speaker,
+                dialer=dialer,
+                pre_event_frames=[],
+                store=application.state.store,
+                privacy_mode="silhouette",
+                now=datetime.now(timezone.utc),
+            )
+            await _publish_cloud(incident)
+
+        try:
+            session = cam.start_session(
+                source=source, detector=detector, on_incident=_on_cue, max_seconds=600.0
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        return {"status": "started", "source": source, "label": session.label}
+
+    @application.post("/demo/camera/stop")
+    def camera_stop() -> dict[str, Any]:
+        from care_ladder.vision import camera as cam
+
+        stopped = cam.stop_session()
+        return {"status": "stopped" if stopped else "not_running"}
+
+    @application.get("/demo/camera/status")
+    def camera_status() -> dict[str, Any]:
+        from care_ladder.vision import camera as cam
+
+        session = cam.active_session()
+        if session is None:
+            return {"running": False}
+        return session.status()
 
     @application.post("/demo/run", response_model=DemoRunResponse)
     async def demo_run(body: DemoRunRequest) -> DemoRunResponse:

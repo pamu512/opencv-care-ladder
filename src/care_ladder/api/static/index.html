@@ -419,6 +419,14 @@
         </div>
         <span class="upload-status" id="upload-status" aria-live="polite"></span>
       </div>
+      <div class="tgroup">
+        <span>Live camera</span>
+        <div class="trow">
+          <button class="btn" id="cam-start" type="button">Start camera</button>
+          <button class="btn" id="cam-stop" type="button" hidden>Stop camera</button>
+        </div>
+        <span class="upload-status" id="cam-status" aria-live="polite"></span>
+      </div>
     </div>
   </section>
 </div>
@@ -678,6 +686,9 @@ function telemetry(inc){
     <div class="sec-title">${icon("i-cue")} Vision telemetry</div>
     <dl class="kv">${kv.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(String(v))}</dd>`).join("")}</dl>
     ${tags.length?`<div class="tags" style="margin-top:10px">${tags.join("")}</div>`:""}
+    <img src="/incidents/${esc(inc.id)}/detection_frame" alt="Annotated detection frame for this cue"
+      style="width:100%;border-radius:8px;margin-top:12px;border:1px solid var(--border)"
+      loading="lazy" onerror="this.remove()">
   </div>`;
 }
 
@@ -968,6 +979,39 @@ document.addEventListener("keydown",(e)=>{
   if(e.key==="Escape") document.querySelectorAll("article.incident.focused")
     .forEach(a=>a.classList.remove("focused"));
 });
+
+/* ---------- live camera ---------- */
+async function camPoll(){
+  try{
+    const s=await jfetch("/demo/camera/status");
+    const start=$("#cam-start"), stop=$("#cam-stop"), status=$("#cam-status");
+    if(s.running){
+      start.hidden=true; stop.hidden=false;
+      const last=s.last_cue?` · last cue: ${s.last_cue.kind}`:"";
+      status.textContent=`LIVE ${Math.floor(s.elapsed_sec/60)}:${String(Math.floor(s.elapsed_sec%60)).padStart(2,"0")} / ${Math.floor(s.max_seconds/60)}min · ${s.frames} frames${last}`;
+    } else {
+      start.hidden=false; stop.hidden=true;
+      if(s.error) status.textContent=`camera: ${s.error}`;
+      else if(status.textContent.startsWith("LIVE")) status.textContent="camera stopped";
+    }
+  }catch{ /* endpoint absent pre-deploy; leave controls hidden state as-is */ }
+}
+$("#cam-start").addEventListener("click",async()=>{
+  const status=$("#cam-status");
+  try{
+    const r=await fetch("/demo/camera/start",{method:"POST",
+      headers:{"content-type":"application/json"},body:JSON.stringify({source:0})});
+    const b=await r.json();
+    if(!r.ok){ status.textContent=`camera start failed: ${b.detail||r.statusText}`; return; }
+    status.textContent="camera starting...";
+    $("#announcer").textContent="Live camera session started.";
+  }catch(e){ status.textContent=`camera start failed: ${e.message}`; }
+});
+$("#cam-stop").addEventListener("click",async()=>{
+  try{ await fetch("/demo/camera/stop",{method:"POST"}); }catch{}
+  $("#cam-status").textContent="camera stopped";
+});
+setInterval(camPoll,3000); camPoll();
 
 bindFixtures();
 refresh(true);
