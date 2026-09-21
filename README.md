@@ -1,5 +1,8 @@
 # Care Ladder
 
+[![CI](https://github.com/pamu512/opencv-care-ladder/actions/workflows/ci.yml/badge.svg)](https://github.com/pamu512/opencv-care-ladder/actions/workflows/ci.yml)
+[![Live demo](https://img.shields.io/badge/demo-live-brightgreen)](https://d2u7pls4da2poz.cloudfront.net/ui/)
+
 Agentic Vision care ladder for the **OpenCV AI Competition 2026** (Agentic Vision track).
 
 OpenCV cues drive a configurable **confirm → Nest/Alexa-style check-in → dial escalation** workflow, with privacy blur/silhouette, pre-event clips, and an incident timeline API for judges.

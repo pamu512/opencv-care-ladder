@@ -93,3 +93,13 @@ If Docker is unavailable in the build environment, the Dockerfile is still the c
 - Grant proposal (submitted separately): `grant/Care-Ladder-OpenCV-AWS-Grant-Proposal.pdf`
 - Known failure modes and limitations: `docs/failure-modes.md`
 - Local judge runbook: root `README.md`
+
+## Cost of the live demo stack
+
+Single-household demo footprint, us-east-1 (Sept 2026 prices, approx.):
+Fargate 0.5 vCPU / 1 GB desired=1 ~ $16.60/mo + ALB ~ $19/mo + CloudFront
+(negligible at demo traffic) + DynamoDB on-demand (tens of writes/day, < $1) +
+S3 silhouette PNGs (< $0.10) + ECR storage (~ $0.50). **Total ~ $37/mo**,
+i.e. the whole hosted demo costs about the same as ONE Aloe Care seat
+($39.99/mo + $199 hardware) - and it scales per additional household by
+camera, not by seat. Grants/credits offset this during the hackathon.

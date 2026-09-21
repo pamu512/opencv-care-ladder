@@ -31,6 +31,8 @@ _DEMO_PLAN_PATH = _REPO_ROOT / "configs" / "demo_home.yaml"
 
 SUPPORTED_FIXTURES = frozenset(
     {
+        "quiet_hours_suppressed",
+        "no_visibility",
         "no_movement_ok",
         "no_movement_silence",
         "opencv_stillness",
@@ -63,6 +65,36 @@ def _incident_summary(incident) -> dict[str, Any]:
         "cue": incident.cue.model_dump(),
         "event_count": len(incident.events),
     }
+
+
+async def _run_quiet_hours_suppressed(store: AuditStore):
+    """Fixture: non-distress cue inside quiet hours -> suppressed (audited)."""
+    plan = load_care_plan(_DEMO_PLAN_PATH)
+    cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "quiet_hours_suppressed"})
+    speaker = SpeakerSimulator(scripted=["I'm fine"])
+    dialer = StubDialer(behavior={})
+    # DEMO_NOW is 12:00; quiet hours window 22:00-07:00 -> pass a 23:30 clock
+    from datetime import datetime, timezone as tz
+
+    night = datetime(2026, 9, 11, 23, 30, tzinfo=tz.utc)
+    incident = await run_incident(
+        cue=cue, plan=plan, speaker=speaker, dialer=dialer,
+        pre_event_frames=[], store=store, now=night,
+    )
+    return incident
+
+
+async def _run_no_visibility(store: AuditStore):
+    """Fixture: person left the monitored zone -> no_visibility cue."""
+    plan = load_care_plan(_DEMO_PLAN_PATH)
+    cue = CueEvent(kind="no_visibility", confidence=0.85, detail={"fixture": "no_visibility"})
+    speaker = SpeakerSimulator(scripted=["I'm fine"])
+    dialer = StubDialer(behavior={})
+    incident = await run_incident(
+        cue=cue, plan=plan, speaker=speaker, dialer=dialer,
+        pre_event_frames=[], store=store, now=DEMO_NOW,
+    )
+    return incident
 
 
 async def _run_no_movement_ok(store: AuditStore):
@@ -609,7 +641,11 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
                 status_code=400,
                 detail=f"unknown fixture {body.fixture!r}; supported: {sorted(SUPPORTED_FIXTURES)}",
             )
-        if body.fixture == "no_movement_ok":
+        if body.fixture == "quiet_hours_suppressed":
+            incident = await _run_quiet_hours_suppressed(application.state.store)
+        elif body.fixture == "no_visibility":
+            incident = await _run_no_visibility(application.state.store)
+        elif body.fixture == "no_movement_ok":
             incident = await _run_no_movement_ok(application.state.store)
         elif body.fixture == "no_movement_silence":
             incident = await _run_no_movement_silence(application.state.store)
