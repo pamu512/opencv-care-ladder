@@ -133,4 +133,4 @@ Slice 1 -> 2 -> 3 (test-first in each), then 4 -> 5 -> 6; slice 7 only if it bec
 - [x] Blast radius checked (CI/main/live stack isolated; OpenCV deadline vs Amazon deadline ordering)
 - [x] PRD locks honored (Alexa+ primary, OpenCV trigger, Fire TV supporting, Bee/Ring out, fail-closed, Calm Care-Tech)
 - [x] Open questions separated, only Q1 design-blocking
-- [ ] Anoop approves plan (this box is the gate)
+- [x] Anoop approves plan (2026-09-26: slices 1-3 approved to implement then check in; Q1 hold-and-restart on recovery; Q5 prototype UI copy verbatim, docs swept; Q4 browser-only recording)

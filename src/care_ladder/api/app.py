@@ -28,9 +28,12 @@ from care_ladder.vision.ingest import ingest_video, save_upload
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _DEMO_PLAN_PATH = _REPO_ROOT / "configs" / "demo_home.yaml"
+_AMAZON_PLAN_PATH = _REPO_ROOT / "configs" / "amazon_demo_home.yaml"
 
 SUPPORTED_FIXTURES = frozenset(
     {
+        "alexa_path_a",
+        "alexa_path_b",
         "quiet_hours_suppressed",
         "no_visibility",
         "no_movement_ok",
@@ -111,6 +114,35 @@ async def _run_no_movement_ok(store: AuditStore):
         pre_event_frames=[],
         store=store,
         now=DEMO_NOW,
+    )
+    return incident
+
+
+async def _run_alexa_path_a(store: AuditStore):
+    """Amazon Path A: stillness cue -> Alexa+ check-in x2 silence -> wait 45s ->
+    notify caretaker -> request_call (simulated) -> emergency fail-closed."""
+    plan = load_care_plan(_AMAZON_PLAN_PATH)
+    cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "alexa_path_a"})
+    speaker = SpeakerSimulator(scripted=[])
+    dialer = StubDialer(behavior={})
+    incident = await run_incident(
+        cue=cue, plan=plan, speaker=speaker, dialer=dialer,
+        pre_event_frames=[], store=store, now=DEMO_NOW,
+    )
+    return incident
+
+
+async def _run_alexa_path_b(store: AuditStore):
+    """Amazon Path B: occlusion (no_visibility) -> Rung 1 holding (camera
+    health, never distress) -> ask to move blanket -> no answer -> notify
+    caretaker on the inform basis -> request_call (simulated) -> fail-closed."""
+    plan = load_care_plan(_AMAZON_PLAN_PATH)
+    cue = CueEvent(kind="no_visibility", confidence=0.85, detail={"fixture": "alexa_path_b"})
+    speaker = SpeakerSimulator(scripted=[])
+    dialer = StubDialer(behavior={})
+    incident = await run_incident(
+        cue=cue, plan=plan, speaker=speaker, dialer=dialer,
+        pre_event_frames=[], store=store, now=DEMO_NOW,
     )
     return incident
 
@@ -339,6 +371,41 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
 
     static_dir = Path(__file__).resolve().parent / "static"
     application.mount("/ui", StaticFiles(directory=static_dir, html=True), name="ui")
+
+    # Self-hosted MCP server (Streamable HTTP, MCP 2025-11-25+) for the
+    # Alexa+ agent path: same container, same port. The internal route is "/"
+    # so the mount serves exactly /mcp; the session manager's lifespan runs
+    # from this app's own lifespan (ASGI mounts do not propagate lifespan).
+    import contextlib
+
+    from care_ladder.mcp_server.server import mcp as care_ladder_mcp
+
+    from mcp.server.transport_security import TransportSecuritySettings
+
+    _mcp_asgi = care_ladder_mcp.streamable_http_app(
+        stateless_http=True,
+        streamable_http_path="/",
+        transport_security=TransportSecuritySettings(
+            enable_dns_rebinding_protection=False
+        ),
+    )
+    application.mount("/mcp", _mcp_asgi)
+
+    _existing_lifespan = application.router.lifespan_context
+
+    @contextlib.asynccontextmanager
+    async def _lifespan(app: FastAPI):
+        # Enter the MCP session manager for the lifetime of the API app
+        # (ASGI mounts do not propagate lifespan to the mounted app).
+        mgr = getattr(care_ladder_mcp, "session_manager", None)
+        if mgr is None:
+            async with _existing_lifespan(app):
+                yield
+            return
+        async with _existing_lifespan(app), mgr.run():
+            yield
+
+    application.router.lifespan_context = _lifespan
 
     @application.get("/plan")
     def get_plan() -> dict[str, Any]:
@@ -641,7 +708,11 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
                 status_code=400,
                 detail=f"unknown fixture {body.fixture!r}; supported: {sorted(SUPPORTED_FIXTURES)}",
             )
-        if body.fixture == "quiet_hours_suppressed":
+        if body.fixture == "alexa_path_a":
+            incident = await _run_alexa_path_a(application.state.store)
+        elif body.fixture == "alexa_path_b":
+            incident = await _run_alexa_path_b(application.state.store)
+        elif body.fixture == "quiet_hours_suppressed":
             incident = await _run_quiet_hours_suppressed(application.state.store)
         elif body.fixture == "no_visibility":
             incident = await _run_no_visibility(application.state.store)

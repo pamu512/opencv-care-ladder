@@ -9,6 +9,7 @@ description = "Agentic Vision care ladder for OpenCV AI Competition 2026"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+  "mcp>=2.2.0",
   "pydantic>=2",
   "pyyaml",
   "opencv-python>=5.0.0.93",

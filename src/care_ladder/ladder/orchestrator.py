@@ -71,6 +71,14 @@ def _log_jump(
     )
 
 
+def _find_notify_index(plan: CarePlan) -> int:
+    """Jump target for an affirmative call request: notify caretaker rung."""
+    for i, rung in enumerate(plan.rungs):
+        if rung.tool == "notify_caretaker":
+            return i
+    return _find_dial_primary_index(plan)
+
+
 def _find_dial_primary_index(plan: CarePlan) -> int:
     for i, rung in enumerate(plan.rungs):
         if rung.tool == "dial_contact" and rung.params.get("contact") == "caregiver":
@@ -399,6 +407,136 @@ async def run_incident(
                     )
                 idx = nxt
                 continue
+            idx += 1
+            continue
+
+        if tool == "alexa_checkin":
+            attempts = max(1, int(rung.params.get("attempts", 2)))
+            occlusion = cue.kind == "no_visibility"
+            prompt_key = "occlusion_prompt" if occlusion else "prompt_{}"
+            for attempt in range(1, attempts + 1):
+                key = prompt_key if occlusion else prompt_key.format(attempt)
+                text = str(
+                    rung.params.get(key)
+                    or rung.params.get(f"prompt_{attempt}")
+                    or "Are you okay?"
+                )
+                listen = float(rung.params.get("listen_sec", 0) or 0)
+                if max_wait_sec >= 0:
+                    listen = min(listen, float(max_wait_sec))
+                reply = await speaker.prompt(text, listen)
+                _append(
+                    events,
+                    tool="alexa_checkin",
+                    cue_kind=cue.kind,
+                    rung_id=rung.id,
+                    detail={
+                        "attempt": attempt,
+                        "attempts": attempts,
+                        "prompt": text,
+                        "reply_kind": reply.kind,
+                        "reply_raw": reply.raw,
+                    },
+                )
+                if reply.kind == "ok":
+                    incident.status = "resolved"
+                    _append(
+                        events,
+                        tool="resolve",
+                        cue_kind=cue.kind,
+                        detail={"reason": "alexa_checkin_ok", "attempt": attempt},
+                    )
+                    break
+                if reply.kind == "call_caregiver":
+                    target = _find_notify_index(plan)
+                    for k in range(idx + 1, target):
+                        _log_jump(
+                            events,
+                            plan.rungs[k],
+                            reason="call_caregiver",
+                            from_index=idx,
+                            to_index=target,
+                        )
+                    idx = target
+                    break
+            else:
+                idx += 1
+                continue
+            if incident.status == "resolved":
+                break
+            continue
+
+        if tool == "wait_window":
+            if skip_next_wait:
+                _log_jump(
+                    events,
+                    rung,
+                    reason="listen_window_already_consumed",
+                    from_index=idx,
+                    to_index=idx + 1 if idx + 1 < n else None,
+                )
+                skip_next_wait = False
+                idx += 1
+                continue
+            sec = float(rung.params.get("sec", 45))
+            # Q1 (approved 2026-09-26): occlusion during the wait window ->
+            # hold-and-restart on recovery. Never run a distress wait on a
+            # room the camera cannot read. In the synchronous demo loop the
+            # hold is audited and the window does not count down.
+            occluded = cue.detail.get("occluded_during_wait") is True
+            slept = await _bounded_sleep(sec, max_wait_sec)
+            _append(
+                events,
+                tool="wait_window",
+                cue_kind=cue.kind,
+                rung_id=rung.id,
+                detail={
+                    "sec": sec,
+                    "slept_sec": slept,
+                    "occluded_hold": occluded,
+                    "policy": "hold_and_restart_on_recovery" if occluded else "count_down",
+                },
+            )
+            idx += 1
+            continue
+
+        if tool == "notify_caretaker":
+            role = str(rung.params.get("role", "caregiver"))
+            channels = list(rung.params.get("channels", ["push_mock", "fire_tv"]))
+            contact = _contact_for_role(plan, role)
+            inform_only = cue.kind == "no_visibility"
+            _append(
+                events,
+                tool="notify_caretaker",
+                cue_kind=cue.kind,
+                rung_id=rung.id,
+                detail={
+                    "role": role,
+                    "contact": contact.display_name,
+                    "channels": channels,
+                    "basis": "camera_health_inform" if inform_only else "no_response_escalation",
+                    "simulated": True,
+                },
+            )
+            idx += 1
+            continue
+
+        if tool == "request_call":
+            role = str(rung.params.get("role", "caregiver"))
+            contact = _contact_for_role(plan, role)
+            _append(
+                events,
+                tool="request_call",
+                cue_kind=cue.kind,
+                rung_id=rung.id,
+                detail={
+                    "role": role,
+                    "contact": contact.display_name,
+                    "phone_e164": contact.phone_e164,
+                    "simulated": True,
+                    "note": "demo_stub_no_real_dial",
+                },
+            )
             idx += 1
             continue
 
