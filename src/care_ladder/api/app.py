@@ -33,6 +33,7 @@ _AMAZON_PLAN_PATH = _REPO_ROOT / "configs" / "amazon_demo_home.yaml"
 SUPPORTED_FIXTURES = frozenset(
     {
         "alexa_path_a",
+        "alexa_path_a_ok",
         "alexa_path_b",
         "quiet_hours_suppressed",
         "no_visibility",
@@ -124,6 +125,19 @@ async def _run_alexa_path_a(store: AuditStore):
     plan = load_care_plan(_AMAZON_PLAN_PATH)
     cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "alexa_path_a"})
     speaker = SpeakerSimulator(scripted=[])
+    dialer = StubDialer(behavior={})
+    incident = await run_incident(
+        cue=cue, plan=plan, speaker=speaker, dialer=dialer,
+        pre_event_frames=[], store=store, now=DEMO_NOW,
+    )
+    return incident
+
+
+async def _run_alexa_path_a_ok(store: AuditStore):
+    """Amazon Path A variant: Meera answers OK on the second attempt."""
+    plan = load_care_plan(_AMAZON_PLAN_PATH)
+    cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "alexa_path_a_ok"})
+    speaker = SpeakerSimulator(scripted=["", "I'm ok, just resting"])
     dialer = StubDialer(behavior={})
     incident = await run_incident(
         cue=cue, plan=plan, speaker=speaker, dialer=dialer,
@@ -371,6 +385,8 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
 
     static_dir = Path(__file__).resolve().parent / "static"
     application.mount("/ui", StaticFiles(directory=static_dir, html=True), name="ui")
+    firetv_dir = static_dir / "firetv"
+    application.mount("/firetv", StaticFiles(directory=firetv_dir, html=True), name="firetv")
 
     # Self-hosted MCP server (Streamable HTTP, MCP 2025-11-25+) for the
     # Alexa+ agent path: same container, same port. The internal route is "/"
@@ -710,6 +726,8 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
             )
         if body.fixture == "alexa_path_a":
             incident = await _run_alexa_path_a(application.state.store)
+        elif body.fixture == "alexa_path_a_ok":
+            incident = await _run_alexa_path_a_ok(application.state.store)
         elif body.fixture == "alexa_path_b":
             incident = await _run_alexa_path_b(application.state.store)
         elif body.fixture == "quiet_hours_suppressed":

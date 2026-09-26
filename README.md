@@ -9,6 +9,49 @@ OpenCV cues drive a configurable **confirm → Nest/Alexa-style check-in → dia
 
 This is a **demo / simulator** stack: telephony is a stub dialer, the smart speaker is a scripted simulator, and there is **no live camera** on the demo path. It does **not** claim clinical diagnosis.
 
+## Amazon update (in-window): Alexa+ + Fire TV (branch `amazon/alexa-plus-fire-tv`)
+
+Significant update built for the **Amazon Build, Ship, Shape** hackathon, on
+top of the pre-window OpenCV project (same repo, same spine):
+
+**Before (pre-window):** OpenCV cues → speaker stub + stub dialer escalation,
+web console for judges. The check-in was a scripted placeholder and the
+caregiver surface was a browser tab.
+
+**After (this update):**
+
+- **Alexa+ check-in rungs** - `alexa_checkin` (two voice attempts with real
+  prompt text), `wait_window` (45s; occlusion holds and restarts on recovery
+  - never runs a distress wait on a room the camera cannot read),
+  `notify_caretaker` (push mock + Fire TV), `request_call` (simulated,
+  reserved fictional `(555) 010-2276`, never dials), emergency still
+  fail-closed off.
+- **Self-hosted MCP server** (the Alexa+ track gate): Streamable HTTP per
+  MCP spec 2025-11-25+, mounted at `/mcp` inside the same FastAPI app. Seven
+  care-flow tools (`start_or_resume_incident`, `check_in_prompt`,
+  `advance_rung`, `resolve_incident`, `get_incident_status`,
+  `notify_caretaker`, `request_call`). `src/care_ladder/mcp_server/alexa_sim.py`
+  is an in-repo MCP **client** that drives the ladder over real HTTP - the
+  demo path proves the tools are agent-callable at runtime.
+- **Fire TV caregiver dashboard** at `/firetv/` (Calm Care-Tech design
+  system, D-pad spatial focus, emergency hold-to-review gate, demo console
+  driving the real API). Silhouette/detection frames only - no live video.
+  Runs in the Silk browser on a Fire TV stick or any browser at 1280x720.
+- **Occlusion Path B** - a covered camera is privacy, never distress: hold →
+  ask Meera to move the blanket → inform Anoop on the camera-health basis.
+
+Run it locally:
+
+```bash
+.venv/bin/uvicorn care_ladder.api.app:app --port 8010
+# Fire TV dashboard: http://127.0.0.1:8010/firetv/   (open Demo console, bottom right)
+# Simulated Alexa+ agent driving MCP over HTTP:
+.venv/bin/python -m care_ladder.mcp_server.alexa_sim --url http://127.0.0.1:8010
+```
+
+Amazon demo household: `configs/amazon_demo_home.yaml` (Meera monitored,
+Anoop → Priya contacts, stillness 4m). The OpenCV demo plan is unchanged.
+
 ## Setup
 
 ```bash
