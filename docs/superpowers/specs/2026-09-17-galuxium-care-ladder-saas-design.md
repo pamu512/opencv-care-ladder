@@ -174,4 +174,14 @@ Same codebase may power OpenCV + Galuxium; packaging and claims differ.
 
 See authoritative cross-hackathon spec: `docs/superpowers/specs/2026-09-27-adaptive-schedule-learning.md`.
 
-Galuxium MVP may ship the JSON-backed `RoutineProfile` stub first; migrate to Postgres with tenancy. Learning is schedule baselines and adaptive timeouts only — not diagnosis. Rapid phase early, then settled. Fail-closed emergency unchanged.
+**Persist now:** JSON under `data/routine_profiles/{subject_key}.json` via `RoutineProfileStore`. Subject key is `tenant_id` or `tenant_id:monitored_id` (`care_ladder.learning.profile.subject_key`). Same GET/POST `/learning` API as OpenCV (`?tenant_id=` / `?monitored_id=`). Facility console (`/ui/`) already shows the Learning schedule / Schedule settled / Learning frozen badge plus Freeze / Reset / Mark settled.
+
+**TODO (Galuxium Task 1+ tenancy):** migrate to Postgres table `routine_profiles` keyed by `tenant_id` (+ optional `monitored_id`). Do not change the profile fields or the `/learning` contract. SaaS Tasks 1-12 stay separate; this block is additive only.
+
+Learning is schedule baselines and adaptive timeouts only - not diagnosis. Rapid phase early, then settled. Fail-closed emergency unchanged.
+
+### Demo shot (learning badge)
+
+| Shot | On screen | VO |
+| --- | --- | --- |
+| Learning badge rapid → settled | Facility `/ui/` chip reads **Learning schedule**; after operator **Mark settled** (or ~10 confirmed-OK days) it reads **Schedule settled**. Timeline explain line shows the timeout. | "First days the ladder learns fast. Once the schedule settles, it only escalates on real deviations, and every timeout stays explainable." |

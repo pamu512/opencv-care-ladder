@@ -10,6 +10,25 @@ from pydantic import BaseModel, Field
 LearningPhase = Literal["rapid", "settled"]
 
 
+def subject_key(
+    *,
+    household_id: str | None = None,
+    tenant_id: str | None = None,
+    monitored_id: str | None = None,
+) -> str:
+    """Household key (OpenCV/Amazon) or tenant[+monitored] key (Galuxium)."""
+    if tenant_id:
+        tid = tenant_id.strip()
+        if not tid:
+            raise ValueError("tenant_id is empty")
+        mid = (monitored_id or "").strip()
+        return f"{tid}:{mid}" if mid else tid
+    hid = (household_id or "").strip()
+    if not hid:
+        raise ValueError("subject_key needs household_id or tenant_id")
+    return hid
+
+
 class LearningConfig(BaseModel):
     """Optional care-plan block. Missing block → these defaults (learning on)."""
 

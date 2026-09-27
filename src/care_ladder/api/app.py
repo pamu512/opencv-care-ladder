@@ -27,6 +27,7 @@ from care_ladder.learning.profile import (
     mark_settled,
     reset_learning,
     schedule_badge,
+    subject_key,
 )
 from care_ladder.learning.store import RoutineProfileStore
 from care_ladder.models import AuditEvent, CueEvent
@@ -394,30 +395,45 @@ def create_app(
             "explain": explain_schedule(profile, effective_timeout_sec=effective),
         }
 
-    def _demo_profile():
+    def _profile_for(
+        tenant_id: str | None = None, monitored_id: str | None = None
+    ):
         plan = load_care_plan(_DEMO_PLAN_PATH)
-        return application.state.profile_store.load(plan.household_id)
+        key = subject_key(
+            household_id=plan.household_id,
+            tenant_id=tenant_id,
+            monitored_id=monitored_id,
+        )
+        return application.state.profile_store.load(key)
 
     @application.get("/learning")
-    def get_learning() -> dict[str, Any]:
-        """Household RoutineProfile badge + explain (demo household)."""
-        return _learning_payload(_demo_profile())
+    def get_learning(
+        tenant_id: str | None = None, monitored_id: str | None = None
+    ) -> dict[str, Any]:
+        """RoutineProfile badge + explain. Optional tenant_id for Galuxium."""
+        return _learning_payload(_profile_for(tenant_id, monitored_id))
 
     @application.post("/learning/freeze")
-    def post_learning_freeze() -> dict[str, Any]:
-        profile = freeze_learning(_demo_profile())
+    def post_learning_freeze(
+        tenant_id: str | None = None, monitored_id: str | None = None
+    ) -> dict[str, Any]:
+        profile = freeze_learning(_profile_for(tenant_id, monitored_id))
         application.state.profile_store.save(profile)
         return _learning_payload(profile)
 
     @application.post("/learning/reset")
-    def post_learning_reset() -> dict[str, Any]:
-        profile = reset_learning(_demo_profile())
+    def post_learning_reset(
+        tenant_id: str | None = None, monitored_id: str | None = None
+    ) -> dict[str, Any]:
+        profile = reset_learning(_profile_for(tenant_id, monitored_id))
         application.state.profile_store.save(profile)
         return _learning_payload(profile)
 
     @application.post("/learning/mark-settled")
-    def post_learning_mark_settled() -> dict[str, Any]:
-        profile = mark_settled(_demo_profile())
+    def post_learning_mark_settled(
+        tenant_id: str | None = None, monitored_id: str | None = None
+    ) -> dict[str, Any]:
+        profile = mark_settled(_profile_for(tenant_id, monitored_id))
         application.state.profile_store.save(profile)
         return _learning_payload(profile)
 

@@ -13,6 +13,7 @@ from care_ladder.learning.profile import (
     new_profile,
     record_incident_outcome,
     reset_learning,
+    subject_key,
 )
 from care_ladder.learning.store import RoutineProfileStore
 
@@ -30,4 +31,5 @@ __all__ = [
     "new_profile",
     "record_incident_outcome",
     "reset_learning",
+    "subject_key",
 ]

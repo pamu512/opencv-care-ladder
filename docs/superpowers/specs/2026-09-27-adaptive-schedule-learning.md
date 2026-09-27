@@ -126,10 +126,10 @@ Do **not** claim neural nets, clinical accuracy, or HIPAA.
 
 ## 11. Success criteria
 
-- [ ] Shared `RoutineProfile` + phase rules + tests on `main`
-- [ ] Effective stillness timeout uses profile; audit explains it
-- [ ] UI badge rapid → settled visible in `/ui` (and Fire TV on Amazon branch)
+- [x] Shared `RoutineProfile` + phase rules + tests on `main`
+- [x] Effective stillness timeout uses profile; audit explains it
+- [x] UI badge rapid → settled visible in `/ui` (Fire TV short labels on Amazon branch)
 - [ ] Amazon branch has equivalent behavior without merging to main
-- [ ] Galuxium plan references this spec; SaaS path uses same API (Postgres later OK)
-- [ ] Existing Path A/B tests still pass (fixtures pin or disable learning as needed)
-- [ ] No clinical / 911 / black-box risk copy in UI
+- [x] Galuxium plan references this spec; SaaS path uses same API (Postgres later OK)
+- [x] Existing Path A/B tests still pass (fixtures pin or disable learning as needed)
+- [x] No clinical / 911 / black-box risk copy in UI

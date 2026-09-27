@@ -1,4 +1,9 @@
-"""JSON file store for RoutineProfile (process-local; gitignore data/)."""
+"""JSON file store for RoutineProfile (process-local; gitignore data/).
+
+Galuxium SaaS Tasks 1-12 stay separate. When Postgres tenancy lands, replace
+this with a ``routine_profiles`` table keyed by ``tenant_id`` (+ optional
+``monitored_id``). Same RoutineProfile fields; do not change the API.
+"""
 
 from __future__ import annotations
 
