@@ -47,6 +47,15 @@ class Rung(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
 
 
+class LearningConfigModel(BaseModel):
+    """Optional care-plan ``learning:`` block (spec 2026-09-27). Missing = defaults."""
+
+    enabled: bool = True
+    settled_after_days: int = 10
+    min_no_movement_timeout_sec: int = 120
+    rapid_timeout_factor: float = 0.4
+
+
 class CarePlan(BaseModel):
     household_id: str
     caregiver: Contact
@@ -56,6 +65,7 @@ class CarePlan(BaseModel):
     rungs: list[Rung]
     quiet_hours: QuietHours | None = None
     secondary: Contact | None = None
+    learning: LearningConfigModel | None = None
 
 
 class CueEvent(BaseModel):
@@ -85,6 +95,7 @@ class Incident(BaseModel):
     cue: CueEvent
     events: list[AuditEvent] = Field(default_factory=list)
     status: IncidentStatus = "open"
+    created_at: datetime | None = None
     pre_event_frame_count: int = 0
     privacy: PrivacyMode | None = None
     # Caregiver acknowledgement (human-in-the-loop): set when a caregiver

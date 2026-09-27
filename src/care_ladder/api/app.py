@@ -21,6 +21,14 @@ from care_ladder.channels.dial import StubDialer
 from care_ladder.cloud.sinks import CloudSinks
 from care_ladder.channels.speaker import SpeakerSimulator
 from care_ladder.ladder.orchestrator import run_incident
+from care_ladder.learning.profile import (
+    LearningConfig,
+    RoutineProfile,
+    freeze as _freeze_learning,
+    mark_settled as _mark_settled,
+    reset as _reset_learning,
+)
+from care_ladder.learning.store import RoutineProfileJSONStore
 from care_ladder.models import AuditEvent, CueEvent
 from care_ladder.plan_loader import load_care_plan
 from care_ladder.vision.cues import CueDetector
@@ -29,6 +37,7 @@ from care_ladder.vision.ingest import ingest_video, save_upload
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _DEMO_PLAN_PATH = _REPO_ROOT / "configs" / "demo_home.yaml"
 _AMAZON_PLAN_PATH = _REPO_ROOT / "configs" / "amazon_demo_home.yaml"
+_LEARNING_STORE = RoutineProfileJSONStore(_REPO_ROOT / "data" / "routine_profiles")
 
 SUPPORTED_FIXTURES = frozenset(
     {
@@ -101,6 +110,15 @@ async def _run_no_visibility(store: AuditStore):
     return incident
 
 
+def _demo_profile():
+    """RoutineProfile for the OpenCV demo household (JSON store, gitignored)."""
+    return _LEARNING_STORE.get_or_create("demo-home-1")
+
+
+def _save_profile(profile):
+    _LEARNING_STORE.save(profile)
+
+
 async def _run_no_movement_ok(store: AuditStore):
     """Fixture: no_movement cue + verbal OK → resolve without dial (spec §10 Path A)."""
     plan = load_care_plan(_DEMO_PLAN_PATH)
@@ -113,6 +131,7 @@ async def _run_no_movement_ok(store: AuditStore):
         speaker=speaker,
         dialer=dialer,
         pre_event_frames=[],
+        routine_profile=_demo_profile(),
         store=store,
         now=DEMO_NOW,
     )
@@ -174,6 +193,7 @@ async def _run_no_movement_silence(store: AuditStore):
         speaker=speaker,
         dialer=dialer,
         pre_event_frames=[],
+        routine_profile=_demo_profile(),
         store=store,
         now=DEMO_NOW,
     )
@@ -422,6 +442,44 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
             yield
 
     application.router.lifespan_context = _lifespan
+
+    @application.get("/learning/{household_id}")
+    def get_learning(household_id: str) -> dict[str, Any]:
+        """RoutineProfile for the UI badge: phase, days, explain, controls state."""
+        profile = _LEARNING_STORE.get_or_create(household_id)
+        plan = load_care_plan(_DEMO_PLAN_PATH)
+        from care_ladder.learning.profile import effective_no_movement_timeout_sec
+
+        eff = effective_no_movement_timeout_sec(plan, profile)
+        return {
+            "household_id": household_id,
+            "learning_phase": profile.learning_phase,
+            "frozen": profile.frozen,
+            "confirmed_ok_days": profile.confirmed_ok_days,
+            "settled_after_days": profile.settled_after_days,
+            "effective_no_movement_timeout_sec": eff,
+            "plan_timeout_sec": plan.triggers.no_movement.timeout_sec,
+            "usual_still_end_hour": profile.usual_still_end_hour,
+        }
+
+    @application.post("/learning/{household_id}/freeze")
+    def learning_freeze(household_id: str) -> dict[str, Any]:
+        profile = _LEARNING_STORE.get_or_create(household_id)
+        _freeze_learning(profile)
+        _LEARNING_STORE.save(profile)
+        return {"household_id": household_id, "frozen": True}
+
+    @application.post("/learning/{household_id}/reset")
+    def learning_reset(household_id: str) -> dict[str, Any]:
+        profile = _reset_learning(_LEARNING_STORE.get_or_create(household_id))
+        _LEARNING_STORE.save(profile)
+        return {"household_id": household_id, "learning_phase": "rapid"}
+
+    @application.post("/learning/{household_id}/settle")
+    def learning_settle(household_id: str) -> dict[str, Any]:
+        profile = _mark_settled(_LEARNING_STORE.get_or_create(household_id))
+        _LEARNING_STORE.save(profile)
+        return {"household_id": household_id, "learning_phase": "settled"}
 
     @application.get("/plan")
     def get_plan() -> dict[str, Any]:

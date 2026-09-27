@@ -44,3 +44,16 @@ def test_ui_served_with_caregiver_console():
     assert "text/html" in resp.headers["content-type"]
     assert "Caregiver" in resp.text
     assert "Path A" in resp.text
+
+def test_ui_served_with_learning_badge():
+    from fastapi.testclient import TestClient
+    from care_ladder.api.app import create_app
+    from care_ladder.audit.store import AuditStore
+
+    with TestClient(create_app(store=AuditStore())) as client:
+        r = client.get('/ui/')
+        assert r.status_code == 200
+        html = r.text
+        assert 'learning-badge' in html
+        assert 'Learning schedule' in html and 'Schedule settled' in html and 'Learning frozen' in html
+        assert '/learning/demo-home-1' in html

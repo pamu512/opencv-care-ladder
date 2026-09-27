@@ -8,7 +8,16 @@ from datetime import datetime, time, timezone
 from typing import Any
 
 from care_ladder.audit.store import AuditStore
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from care_ladder.learning.profile import RoutineProfile
+
 from care_ladder.channels.dial import StubDialer, next_rung_after_no_answer
+from care_ladder.learning.profile import (
+    effective_no_movement_timeout_sec,
+)
+from care_ladder.learning.profile import explain as _learning_explain
 from care_ladder.channels.speaker import SpeakerChannel
 from care_ladder.models import AuditEvent, CarePlan, CueEvent, Incident, PrivacyMode, Rung
 from care_ladder.privacy import blur_faces, to_silhouette
@@ -131,6 +140,12 @@ def _apply_privacy(
     return transformed, mode, len(transformed)
 
 
+def _learning_enabled(plan: CarePlan) -> bool:
+    """Learning block absent -> enabled defaults (spec: missing = enabled)."""
+    cfg = plan.learning
+    return cfg is None or cfg.enabled
+
+
 def _annotate_detection_frame(frame, cue) -> "np.ndarray | None":
     """Draw the detector's view: bounding box (if carried in cue.detail) plus
     key telemetry, so the console can show WHY the cue fired."""
@@ -177,6 +192,7 @@ async def run_incident(
     speaker: SpeakerChannel,
     dialer: StubDialer,
     pre_event_frames: list[Any] | None = None,
+    routine_profile: "RoutineProfile | None" = None,
     *,
     store: AuditStore | None = None,
     max_wait_sec: float = 0.05,
@@ -195,6 +211,23 @@ async def run_incident(
 
     Pre-event frames are privacy-transformed (default blur) before attach count.
     """
+    # Adaptive schedule learning (spec 2026-09-27): resolve effective stillness
+    # timeout from the household's RoutineProfile BEFORE building the incident,
+    # and record the explain string on the cue detail for the timeline/UI.
+    learning_detail: dict[str, Any] | None = None
+    if routine_profile is not None and _learning_enabled(plan):
+        plan_timeout = int(plan.triggers.no_movement.timeout_sec)
+        eff = effective_no_movement_timeout_sec(plan, routine_profile)
+        learning_detail = {
+            "learning_phase": routine_profile.learning_phase,
+            "effective_timeout_sec": eff,
+            "plan_timeout_sec": plan_timeout,
+            "explain": _learning_explain(
+                routine_profile, plan_timeout_sec=plan_timeout, effective_sec=eff
+            ),
+        }
+        cue = cue.model_copy(update={"detail": {**cue.detail, "learning": learning_detail}})
+
     frames_in = list(pre_event_frames or [])
     # Detection frame (P1.1): annotate the cue's box/telemetry on a copy of the
     # raw frame, THEN privacy-transform it like every other frame - judges see
@@ -208,12 +241,14 @@ async def run_incident(
     if frame_count > 0 and privacy not in {"blur", "silhouette"}:
         private_frames, privacy, frame_count = [], None, 0
 
+    clock = now or datetime.now(timezone.utc)
     incident = Incident(
         id=uuid.uuid4().hex,
         household_id=plan.household_id,
         cue=cue,
         events=[],
         status="open",
+        created_at=clock,
         pre_event_frame_count=frame_count,
         privacy=privacy,
     )
@@ -239,7 +274,6 @@ async def run_incident(
         detail=cue_detail,
     )
 
-    clock = now or datetime.now(timezone.utc)
     if (
         plan.quiet_hours is not None
         and plan.quiet_hours.policy == "soft_suppress_non_distress"
@@ -579,6 +613,37 @@ async def run_incident(
 
     if incident.status == "open":
         incident.status = "exhausted"
+
+    # Adaptive schedule learning (spec 2026-09-27 section 5): record outcome
+    # on every closed incident and audit the profile state. Learning never
+    # touches rung shape or emergency; it only moves timing.
+    if routine_profile is not None and _learning_enabled(plan):
+        from care_ladder.learning.profile import record_incident_outcome
+
+        start_hour = (now or datetime.now(timezone.utc)).hour
+        if incident.created_at is not None:
+            start_hour = incident.created_at.hour
+        resolved_ok = incident.status == "resolved"
+        ok_day = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+        record_incident_outcome(
+            routine_profile,
+            cue_kind=cue.kind,
+            cue_start_hour=start_hour,
+            resolved_ok=resolved_ok,
+            ok_day=ok_day,
+        )
+        _append(
+            events,
+            tool="routine_profile_update",
+            cue_kind=cue.kind,
+            detail={
+                "learning_phase": routine_profile.learning_phase,
+                "confirmed_ok_days": routine_profile.confirmed_ok_days,
+                "suggested_timeout_sec": routine_profile.suggested_no_movement_timeout_sec,
+                "explain": (cue.detail.get("learning") or {}).get("explain", ""),
+                "frozen": routine_profile.frozen,
+            },
+        )
 
     if store is not None:
         store.save(incident)
