@@ -121,16 +121,18 @@ async def _run_no_movement_ok(store: AuditStore):
     cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "no_movement_ok"})
     speaker = SpeakerSimulator(scripted=["I'm fine"])
     dialer = StubDialer(behavior={})  # never reached on this path
+    profile = _demo_profile()
     incident = await run_incident(
         cue=cue,
         plan=plan,
         speaker=speaker,
         dialer=dialer,
         pre_event_frames=[],
-        routine_profile=_demo_profile(),
+        routine_profile=profile,
         store=store,
         now=DEMO_NOW,
     )
+    _save_profile(profile)  # persist learning update (spec section 5)
     return incident
 
 
@@ -141,16 +143,18 @@ async def _run_no_movement_silence(store: AuditStore):
     # Silence path: empty script → escalate; secondary answers so incident resolves.
     speaker = SpeakerSimulator(scripted=[])
     dialer = StubDialer(behavior={"caregiver": "no_answer", "secondary": "answered"})
+    profile = _demo_profile()
     incident = await run_incident(
         cue=cue,
         plan=plan,
         speaker=speaker,
         dialer=dialer,
         pre_event_frames=[],
-        routine_profile=_demo_profile(),
+        routine_profile=profile,
         store=store,
         now=DEMO_NOW,
     )
+    _save_profile(profile)  # persist learning update (spec section 5)
     return incident
 
 

@@ -36,6 +36,9 @@ def test_fixture_incident_carries_learning_detail_and_audit():
     with TestClient(create_app(store=AuditStore())) as client:
         client.post("/learning/demo-home-1/reset")
         r = client.post("/demo/run", json={"fixture": "no_movement_ok"})
+        # OK resolve must bump the PERSISTED profile (spec 5: update on close)
+        after = client.get("/learning/demo-home-1").json()
+        assert after["confirmed_ok_days"] >= 1
         iid = r.json()["incident_id"]
         inc = client.get(f"/incidents/{iid}").json()
         learning = inc["cue"]["detail"].get("learning")
