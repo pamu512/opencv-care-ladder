@@ -17,6 +17,15 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
+## Adaptive schedule learning
+
+The ladder learns the household's usual day from closed incidents
+(`RoutineProfile`: rapid -> settled after 10 confirmed-OK days, freezable) and
+adapts the stillness timeout with a timeline-visible explain line. This is
+schedule-baseline learning only - not machine learning, not clinical, and it
+never touches rung order or the fail-closed emergency gate. See
+`docs/superpowers/specs/2026-09-27-adaptive-schedule-learning.md`.
+
 ## How OpenCV cues change rungs
 
 1. **Vision (`CueDetector`)** watches frames in a plan zone and may emit a structured `CueEvent`:

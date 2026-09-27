@@ -129,3 +129,18 @@ def test_json_store_safe_keys(tmp_path: Path):
     # sanitized: no path traversal separators survive
     assert "/" not in files[0].name and files[0].name.startswith("_etc_evil") is False
     assert files[0].parent == store.root  # stayed inside the store root
+
+def test_tenant_scoped_subject_keys(tmp_path):
+    """Galuxium hook (spec section 4): tenant_id + monitored id as subject key.
+    JSON store today; Postgres routine_profiles table when tenancy lands."""
+    from care_ladder.learning.store import RoutineProfileJSONStore as S
+
+    store = S(tmp_path / "rp")
+    a = store.get_or_create("tenant-42:monitored-7")
+    b = store.get_or_create("tenant-99:monitored-7")
+    assert a.subject_key != b.subject_key
+    store.save(a)
+    assert store.get("tenant-42:monitored-7").subject_key == "tenant-42:monitored-7"
+    # tenant-99 never saved: get returns None until created
+    assert store.get("tenant-99:monitored-7") is None
+    assert store.get_or_create("tenant-99:monitored-7").confirmed_ok_days == 0
