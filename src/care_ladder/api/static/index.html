@@ -67,6 +67,9 @@
   .brand h1{font-size:17px;font-weight:650;letter-spacing:-.01em;line-height:1.15}
   .brand .sub{font-size:11.5px;color:var(--muted);font-family:var(--font-mono);letter-spacing:.01em}
   .bar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .chip[data-phase="rapid"]{color:var(--info);border-color:color-mix(in srgb,var(--info) 40%,transparent)}
+  .chip[data-phase="settled"]{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+  .chip[data-phase="frozen"]{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
   .chip{display:inline-flex;align-items:center;gap:6px;font:500 11.5px/1 var(--font-mono);
     color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:6px 11px}
   .chip .dot{width:6px;height:6px;border-radius:50%;background:var(--ok)}
@@ -372,6 +375,7 @@
       </div>
     </div>
     <div class="bar-right">
+      <span class="chip" id="learning-badge" hidden><span class="dot" aria-hidden="true"></span> <span id="learning-badge-text">Learning schedule</span></span>
       <span class="chip"><span class="dot" aria-hidden="true"></span> demo · reserved phones · emergency fail-closed</span>
       <button class="iconbtn" id="theme-toggle" type="button" aria-label="Switch color theme" title="Switch theme">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-sun" id="theme-icon"/></svg>
@@ -687,11 +691,16 @@ function telemetry(inc){
   for (const e of d.track_events||[])
     if (e.type==="enter"||e.type==="leave")
       tags.push(`<span class="tag">${e.type} t${e.track_id} @ ${e.t}s</span>`);
-  if (!kv.length && !tags.length) return "";
+  const learn = (inc.cue && inc.cue.detail && inc.cue.detail.learning) ? inc.cue.detail.learning : null;
+  const learnLine = learn ? `<div class="push-note" style="margin-top:10px;font-size:12.5px;color:var(--muted)">
+      ${esc(learn.explain || "adaptive timeout active")}
+    </div>` : "";
+  if (!kv.length && !tags.length && !learn) return "";
   return `<div class="telem">
     <div class="sec-title">${icon("i-cue")} Vision telemetry</div>
     <dl class="kv">${kv.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(String(v))}</dd>`).join("")}</dl>
     ${tags.length?`<div class="tags" style="margin-top:10px">${tags.join("")}</div>`:""}
+    ${learnLine}
     <img src="/incidents/${esc(inc.id)}/detection_frame" alt="Annotated detection frame for this cue"
       style="width:100%;border-radius:8px;margin-top:12px;border:1px solid var(--border)"
       loading="lazy" onerror="this.remove()">
@@ -1019,8 +1028,23 @@ $("#cam-stop").addEventListener("click",async()=>{
 });
 setInterval(camPoll,3000); camPoll();
 
+/* ---------- adaptive schedule learning badge (spec 2026-09-27) ---------- */
+async function refreshLearningBadge(){
+  try{
+    const d = await jfetch("/learning/demo-home-1");
+    const badge = $("#learning-badge"), text = $("#learning-badge-text");
+    badge.hidden = false;
+    if(d.frozen){ text.textContent = "Learning frozen"; badge.dataset.phase = "frozen"; }
+    else if(d.learning_phase === "settled"){ text.textContent = "Schedule settled"; badge.dataset.phase = "settled"; }
+    else { text.textContent = "Learning schedule"; badge.dataset.phase = "rapid"; }
+    badge.title = `stillness timeout ${Math.round(d.effective_no_movement_timeout_sec/60)}m (plan ${Math.round(d.plan_timeout_sec/60)}m) · ${d.confirmed_ok_days}/${d.settled_after_days} OK days`;
+  }catch{ /* endpoint absent: badge stays hidden */ }
+}
+
 bindFixtures();
 refresh(true);
+refreshLearningBadge();
+setInterval(()=>{ if(!document.hidden) refreshLearningBadge(); }, 20000);
 setInterval(()=>{ if(!state.uploading && !document.hidden) refresh(); },20000);
 </script>
 </body>
