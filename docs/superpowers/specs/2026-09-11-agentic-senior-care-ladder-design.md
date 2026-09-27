@@ -184,3 +184,7 @@ Borrow product patterns, not vendor stacks or accuracy claims. All are in scope 
 - Exact Nest/Alexa integration path for hackathon (skill + companion app vs simulated speaker UI).  
 - Whether to pursue COOL on Graviton as a stretch after Agentic Vision bar is met.  
 - Edge vs cloud-only OpenCV for the submission video.
+
+## Adaptive schedule learning (2026-09-27)
+
+Cross-hackathon: `docs/superpowers/specs/2026-09-27-adaptive-schedule-learning.md` and plan `docs/superpowers/plans/2026-09-27-adaptive-schedule-learning.md`. Rapid early learning of schedule baselines, then settle; explainable timeouts only.
