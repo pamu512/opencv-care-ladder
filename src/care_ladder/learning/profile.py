@@ -8,7 +8,7 @@ sensitivity move, with an audit-visible explain string.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Literal
 
@@ -17,6 +17,26 @@ from pydantic import BaseModel, Field
 from care_ladder.models import CarePlan
 
 LearningPhase = Literal["rapid", "settled"]
+
+
+def subject_key(
+    *,
+    household_id: str | None = None,
+    tenant_id: str | None = None,
+    monitored_id: str | None = None,
+) -> str:
+    """Canonical profile key: household (OpenCV/Amazon) or tenant[+monitored]
+    (Galuxium). Ported from the Cursor branch (credit: ide/*-c860 PRs)."""
+    if tenant_id:
+        tid = tenant_id.strip()
+        if not tid:
+            raise ValueError("tenant_id is empty")
+        mid = (monitored_id or "").strip()
+        return f"{tid}:{mid}" if mid else tid
+    hid = (household_id or "").strip()
+    if not hid:
+        raise ValueError("subject_key needs household_id or tenant_id")
+    return hid
 
 
 class LearningConfig(BaseModel):
@@ -42,6 +62,9 @@ class RoutineProfile(BaseModel):
     suggested_no_movement_timeout_sec: int | None = None
     usual_still_end_hour: int | None = None
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Persisted OK-day dedupe: survives process restarts (unlike a transient
+    # attr, which double-counts the same calendar day after a redeploy).
+    last_confirmed_ok_date: date | None = None
 
 
 def _clamp(value: float, lo: float, hi: float) -> float:
@@ -137,9 +160,15 @@ def record_incident_outcome(
 
     if resolved_ok:
         profile.ok_resolve_hour_hist[hour] += 1
-        if ok_day and ok_day != getattr(profile, "_last_ok_day", None):
+        from datetime import date as _date
+
+        try:
+            day = _date.fromisoformat(ok_day) if ok_day else None
+        except ValueError:
+            day = None
+        if day is not None and day != profile.last_confirmed_ok_date:
             profile.confirmed_ok_days += 1
-            profile._last_ok_day = ok_day  # type: ignore[attr-defined]
+            profile.last_confirmed_ok_date = day
 
     # derive usual still end hour (p80 of still-cue mass)
     profile.usual_still_end_hour = _p80(profile.still_hour_hist)

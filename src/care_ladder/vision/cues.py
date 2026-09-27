@@ -7,7 +7,13 @@ from typing import Any, Sequence
 import cv2
 import numpy as np
 
+from typing import TYPE_CHECKING
+
+from care_ladder.learning.profile import effective_no_movement_timeout_sec
 from care_ladder.models import CarePlan, CueEvent
+
+if TYPE_CHECKING:
+    from care_ladder.learning.profile import RoutineProfile
 from care_ladder.vision.pose_heuristics import PoseHeuristics, torso_metrics
 from care_ladder.vision.tracker import PersonTracker
 
@@ -75,8 +81,20 @@ class CueDetector:
         self.pose_state = PoseHeuristics() if pose_model is not None else None
 
     @classmethod
-    def from_plan(cls, plan: CarePlan, zone_id: str | None = None) -> CueDetector:
-        """Build a detector from ``CarePlan.triggers`` and a named (or first) zone."""
+    def from_plan(
+        cls,
+        plan: CarePlan,
+        zone_id: str | None = None,
+        profile: "RoutineProfile | None" = None,
+    ) -> CueDetector:
+        """Build a detector from ``CarePlan.triggers`` and a named (or first) zone.
+
+        ``profile`` (spec 2026-09-27 section 6): when learning is enabled the
+        detector arms at the ADAPTIVE stillness timeout, not the plan timeout -
+        the badge number and the actual arming threshold must be the same
+        number. ``None`` keeps the plan timeout (learning off / exact-timeout
+        tests).
+        """
         if not plan.zones:
             raise ValueError("care plan has no zones for CueDetector.from_plan")
         zone_model = None
@@ -91,8 +109,15 @@ class CueDetector:
             zone_model = plan.zones[0]
 
         polygon = [(float(p[0]), float(p[1])) for p in zone_model.polygon]
+        timeout = float(plan.triggers.no_movement.timeout_sec)
+        if profile is not None:
+            learning_cfg = plan.learning
+            if learning_cfg is None or learning_cfg.enabled:
+                timeout = float(
+                    effective_no_movement_timeout_sec(plan, profile)
+                )
         return cls(
-            no_movement_timeout_sec=float(plan.triggers.no_movement.timeout_sec),
+            no_movement_timeout_sec=timeout,
             zone=polygon,
             enable_no_movement=bool(plan.triggers.no_movement.enabled),
             enable_no_visibility=bool(plan.triggers.no_visibility.enabled),
