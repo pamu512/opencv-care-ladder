@@ -300,3 +300,9 @@ Exact dates can slip; **Submit buffer** before 2026-10-24 03:00 HKT is mandatory
 | --- | --- |
 | 2026-09-26 | Initial PRD from Approach A lock (Alexa+ primary, OpenCV trigger, Fire TV supporting, Bee out) |
 | 2026-09-26 | Folded Anoop Fire TV handoff: design pillars, Calm Care-Tech tokens, five-rung + occlusion Path B, Meera/Anoop demo household, prototype + canvas + screenshots under `fire-tv-dashboard/` |
+
+## Adaptive schedule learning (2026-09-27)
+
+Authoritative: `docs/superpowers/specs/2026-09-27-adaptive-schedule-learning.md`.
+
+Alexa+ / Fire TV surfaces show Learning → Settled → Frozen (short Calm Care-Tech labels) and use adaptive stillness timeouts from `RoutineProfile`. This lives on `amazon/alexa-plus-fire-tv` (or a PR into it). Do not merge to `main` until the OpenCV judging gate (~Oct 26).
