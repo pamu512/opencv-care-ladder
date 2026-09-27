@@ -12,7 +12,10 @@ Alexa+ agent checks in by voice (two attempts, real conversation quoted on
 the caregiver's Fire TV), waits, then notifies the family with a complete
 timestamped audit trail. The same repo shipped the OpenCV-only version
 earlier; this in-window update adds the Alexa+ MCP agent path and the Fire
-TV dashboard. Not a medical device; never calls emergency services on its
+TV dashboard. First days the ladder learns a usual schedule from audit
+histograms (shorter stillness timeouts), then settles; Fire TV shows a short
+Learning / Settled / Frozen badge with an explainable timeout - not a neural
+net or risk score. Not a medical device; never calls emergency services on its
 own; silhouette-only video.
 
 ## Track

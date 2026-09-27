@@ -284,6 +284,9 @@
     </div>
     <span class="top-meta">Meera's home · Fire TV</span>
     <div class="top-spacer"></div>
+    <div class="status-pill info" id="learnBadge" role="status">
+      <span class="dot"></span><span id="learnBadgeText">Learning</span>
+    </div>
     <div class="status-pill ok" id="statusPill" role="status" aria-live="polite">
       <span class="dot"></span><span id="statusText">Ladder watching</span>
     </div>
@@ -395,7 +398,7 @@
     const colors = { cue:'var(--slate)', reperceive:'var(--slate)', alexa_checkin:'var(--amber)',
       wait_window:'rgba(239,234,226,0.4)', notify_caretaker:'var(--clay)', request_call:'var(--clay)',
       jump:'var(--ink-40)', resolve:'var(--sage)', emergency:'var(--clay)', suppress:'var(--ink-40)',
-      ack:'var(--sage)', caregiver_ack:'var(--sage)' };
+      ack:'var(--sage)', caregiver_ack:'var(--sage)', routine_profile_update:'var(--slate)' };
     $('auditEvents').innerHTML = events.slice(-6).reverse().map(ev => `
       <div class="a-ev">
         <span class="a-r" style="color:${colors[ev.tool] || 'var(--ink-40)'}">${esc(ev.tool)}</span>
@@ -484,7 +487,7 @@
       setPill('ok', 'Care plan active'); setChip('ok', 'Standby');
       $('incId').textContent = 'no active incident';
       $('heroTitle').textContent = 'All clear';
-      $('heroSub').textContent = 'Meera settled after lunch · living room. The ladder is watching and will confirm before it ever escalates.';
+      $('heroSub').textContent = 'Meera settled after lunch · living room. First days the ladder learns fast, then settles — timeouts stay explainable.';
       $('pushNote').hidden = true;
       $('silFigure').className = 'sil-figure'; $('silFrame').hidden = true;
       $('silLabel').textContent = 'Silhouette · processed on device';
@@ -594,9 +597,22 @@
     toast('Call requested — reserved fictional number, demo only');
   }
 
+  const LEARN_SHORT = { rapid: 'Learning', settled: 'Settled', frozen: 'Frozen' };
+
+  async function loadLearning() {
+    try {
+      const L = await (await fetch('/learning')).json();
+      const el = $('learnBadgeText');
+      if (!el) return;
+      el.textContent = L.badge_short || LEARN_SHORT[L.frozen ? 'frozen' : (L.learning_phase || 'rapid')] || 'Learning';
+      $('learnBadge').className = 'status-pill ' + (L.frozen ? 'attend' : L.learning_phase === 'settled' ? 'ok' : 'info');
+    } catch { /* keep last badge */ }
+  }
+
   // -- polling --
   async function refresh() {
     try {
+      await loadLearning();
       const r = await fetch('/incidents');
       const list = await r.json();
       const mine = list.filter(i => i.household_id === state.household);
