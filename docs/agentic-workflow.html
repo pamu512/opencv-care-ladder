@@ -23,6 +23,7 @@
 <div class="wrap">
   <h1><span style="color:#22d3ee">●</span> Care Ladder - Agentic Vision Workflow</h1>
   <div class="sub">OpenCV 5 cues drive a configurable escalation ladder · perception → decision → action · every step audited</div>
+  <div class="sub">Live demo runs on ECS Fargate X86_64 behind CloudFront. Graviton ARM64 is a design preference, not the current tip.</div>
   <div class="card">
 <svg viewBox="0 0 1140 620" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -160,7 +161,7 @@
   <g>
     <rect x="810" y="60" width="290" height="54" rx="6" fill="#0f172a"/>
     <rect x="810" y="60" width="290" height="54" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
-    <text x="955" y="80" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">ECS Fargate · Graviton ARM64</text>
+    <text x="955" y="80" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">ECS Fargate · X86_64 (live)</text>
     <text x="955" y="94" fill="#64748b" font-size="8" text-anchor="middle">OpenCV 5 DNN + FastAPI · self-healing service</text>
   </g>
   <g>
@@ -235,7 +236,7 @@
     <div class="card"><h3><span class="dot emerald"></span>Decision</h3><ul>
       <li>YAML rungs, per-household</li><li>Reply-driven branching, logged jumps</li><li>Emergency fail-closed</li></ul></div>
     <div class="card"><h3><span class="dot amber"></span>Action</h3><ul>
-      <li>Fargate (ARM64) self-healing</li><li>S3 silhouette clips · EventBridge bus</li><li>Caregiver timeline + clip viewer</li></ul></div>
+      <li>Fargate (X86_64) self-healing</li><li>S3 silhouette clips · EventBridge bus</li><li>Caregiver timeline + clip viewer</li></ul></div>
   </div>
   <footer>Care Ladder · OpenCV AI Competition 2026 · Agentic Vision</footer>
 </div>
