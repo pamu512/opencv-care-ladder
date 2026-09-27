@@ -150,11 +150,13 @@ async def _run_alexa_path_a(store: AuditStore):
     cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "alexa_path_a"})
     speaker = SpeakerSimulator(scripted=[])
     dialer = StubDialer(behavior={})
+    profile = _amazon_profile()
     incident = await run_incident(
         cue=cue, plan=plan, speaker=speaker, dialer=dialer,
-        routine_profile=_amazon_profile(),
+        routine_profile=profile,
         pre_event_frames=[], store=store, now=DEMO_NOW,
     )
+    _LEARNING_STORE.save(profile)  # persist learning update (spec section 5)
     return incident
 
 
@@ -164,11 +166,13 @@ async def _run_alexa_path_a_ok(store: AuditStore):
     cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "alexa_path_a_ok"})
     speaker = SpeakerSimulator(scripted=["", "I'm ok, just resting"])
     dialer = StubDialer(behavior={})
+    profile = _amazon_profile()
     incident = await run_incident(
         cue=cue, plan=plan, speaker=speaker, dialer=dialer,
-        routine_profile=_amazon_profile(),
+        routine_profile=profile,
         pre_event_frames=[], store=store, now=DEMO_NOW,
     )
+    _LEARNING_STORE.save(profile)  # persist learning update (spec section 5)
     return incident
 
 
@@ -180,11 +184,13 @@ async def _run_alexa_path_b(store: AuditStore):
     cue = CueEvent(kind="no_visibility", confidence=0.85, detail={"fixture": "alexa_path_b"})
     speaker = SpeakerSimulator(scripted=[])
     dialer = StubDialer(behavior={})
+    profile = _amazon_profile()
     incident = await run_incident(
         cue=cue, plan=plan, speaker=speaker, dialer=dialer,
-        routine_profile=_amazon_profile(),
+        routine_profile=profile,
         pre_event_frames=[], store=store, now=DEMO_NOW,
     )
+    _LEARNING_STORE.save(profile)  # persist learning update (spec section 5)
     return incident
 
 

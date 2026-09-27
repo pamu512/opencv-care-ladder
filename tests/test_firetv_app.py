@@ -91,6 +91,8 @@ def test_amazon_fixture_carries_learning_detail():
     with TestClient(create_app(store=AuditStore())) as client:
         client.post('/learning/amazon-demo-1/reset')
         r = client.post('/demo/run', json={'fixture': 'alexa_path_a'})
+        after = client.get('/learning/amazon-demo-1').json()
+        assert after['confirmed_ok_days'] >= 0  # silence path: no OK bump, but persisted state readable
         inc = client.get(f"/incidents/{r.json()['incident_id']}").json()
         learning = inc['cue']['detail'].get('learning')
         assert learning and learning['learning_phase'] in {'rapid', 'settled'}
