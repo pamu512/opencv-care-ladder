@@ -70,6 +70,10 @@
   .chip{display:inline-flex;align-items:center;gap:6px;font:500 11.5px/1 var(--font-mono);
     color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:6px 11px}
   .chip .dot{width:6px;height:6px;border-radius:50%;background:var(--ok)}
+  .chip.learn{color:var(--info);border-color:color-mix(in srgb,var(--info) 35%,var(--border))}
+  .chip.learn[data-phase="settled"]{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 35%,var(--border))}
+  .chip.learn[data-phase="frozen"]{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 35%,var(--border))}
+  .learn-explain{font-size:13px;color:var(--muted);padding:0 20px 12px}
   .iconbtn{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;
     border-radius:9px;border:1px solid var(--border);background:transparent;color:var(--muted);
     cursor:pointer;transition:color var(--dur),border-color var(--dur)}
@@ -372,6 +376,7 @@
       </div>
     </div>
     <div class="bar-right">
+      <span class="chip learn" id="learn-badge" data-phase="rapid">Learning schedule</span>
       <span class="chip"><span class="dot" aria-hidden="true"></span> demo · reserved phones · emergency fail-closed</span>
       <button class="iconbtn" id="theme-toggle" type="button" aria-label="Switch color theme" title="Switch theme">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-sun" id="theme-icon"/></svg>
@@ -433,6 +438,14 @@
         </div>
         <span class="upload-status" id="cam-status" aria-live="polite"></span>
       </div>
+      <div class="tgroup">
+        <span>Schedule learning</span>
+        <div class="trow">
+          <button class="btn" data-learn="freeze" type="button">Freeze</button>
+          <button class="btn" data-learn="reset" type="button">Reset</button>
+          <button class="btn" data-learn="mark-settled" type="button">Mark settled</button>
+        </div>
+      </div>
     </div>
   </section>
 </div>
@@ -479,11 +492,17 @@ const TOOL_META = {
   notify:         {icon:"i-phone",  label:"Notify"},
   resolve:        {icon:"i-check",  label:"Resolve"},
   suppress:       {icon:"i-moon",   label:"Quiet hours"},
+  routine_profile_update: {icon:"i-clock", label:"Schedule update"},
 };
 const CUE_LABEL = {
   no_movement: "Stillness in zone",
   no_visibility: "Person left zone",
   distress_heuristic: "Fall signature (sudden vertical-to-horizontal)",
+};
+const LEARN_BADGE = {
+  rapid: "Learning schedule",
+  settled: "Schedule settled",
+  frozen: "Learning frozen",
 };
 const RENDER_LIMIT = 12;
 
@@ -559,6 +578,14 @@ function verdict(inc){
   return bits.join(" → ");
 }
 
+function learningLine(inc){
+  const upd = [...inc.events].reverse().find(e=>e.tool==="routine_profile_update");
+  const cue = inc.events.find(e=>e.tool==="cue");
+  const text = upd?.detail?.explain || cue?.detail?.explain || "";
+  if (!text) return "";
+  return `<p class="learn-explain">${esc(text)}</p>`;
+}
+
 /* ---------- ladder rail ---------- */
 function rungNode(id, tool, detail){
   const t = TOOL_META[tool] || {icon:"i-code", label:tool};
@@ -587,7 +614,7 @@ function buildRail(inc){
   for (const ev of inc.events){
     if (ev.tool === "cue") continue;
     if (ev.tool === "resolve"){ lastRungId && byId.get(lastRungId) && (byId.get(lastRungId).state="cleared"); continue; }
-    if (ev.tool === "suppress") continue;
+    if (ev.tool === "suppress" || ev.tool === "routine_profile_update") continue;
     if (ev.tool === "jump"){
       const rid = ev.detail?.skipped_rung_id;
       if (rid && !byId.has(rid)){
@@ -730,6 +757,9 @@ function detailText(ev){
   if (d.privacy) b.push("privacy: "+esc(d.privacy));
   if (d.sec!=null && d.slept_sec!=null) b.push(`wait ${d.sec}s (slept ${d.slept_sec}s)`);
   if (d.note) b.push(esc(d.note));
+  if (d.explain) b.push(esc(d.explain));
+  if (d.learning_phase) b.push("phase: "+esc(d.learning_phase));
+  if (d.effective_timeout_sec!=null) b.push("timeout "+d.effective_timeout_sec+"s");
   return b.join(" · ");
 }
 function timelineHTML(inc){
@@ -773,6 +803,7 @@ function renderIncident(inc, frames){
     </div>
     ${distress?`<div class="fall-banner">${icon("i-alert")}Fall signature detected: sudden vertical-to-horizontal transition; the ladder escalates past the verbal rung.</div>`:""}
     <div class="verdict">${icon("i-shield")}<p>${verdict(inc)}</p></div>
+    ${learningLine(inc)}
     <div class="railwrap">${renderRail(inc)}</div>
     <div class="dossier">${clipHTML(inc,frames)}${telemetry(inc)}</div>
     ${timelineHTML(inc)}
@@ -868,6 +899,7 @@ async function refresh(force=false){
     $("#fatal").hidden=true;
   }catch(err){ el.innerHTML=""; fatalBox(err); return; }
   await loadPlan();
+  await loadLearning();
 
   $("#stats").hidden=false;
   $("#s-total").textContent=list.length;
@@ -1018,6 +1050,31 @@ $("#cam-stop").addEventListener("click",async()=>{
   $("#cam-status").textContent="camera stopped";
 });
 setInterval(camPoll,3000); camPoll();
+
+async function loadLearning(){
+  const el=$("#learn-badge");
+  if (!el) return;
+  try{
+    const L = await jfetch("/learning");
+    const phase = L.frozen ? "frozen" : (L.learning_phase || "rapid");
+    el.textContent = L.badge || LEARN_BADGE[phase] || LEARN_BADGE.rapid;
+    el.dataset.phase = phase;
+  }catch{ /* keep last badge */ }
+}
+
+document.querySelectorAll("[data-learn]").forEach(btn=>{
+  btn.addEventListener("click", async ()=>{
+    btn.disabled=true;
+    try{
+      const r=await fetch(`/learning/${btn.dataset.learn}`,{method:"POST"});
+      if(!r.ok){ const b=await r.json().catch(()=>({}));
+        $("#announcer").textContent=`Learning control failed: ${b.detail||r.statusText}`; return; }
+      await loadLearning();
+      $("#announcer").textContent=`Schedule learning: ${$("#learn-badge").textContent}.`;
+    }catch(e){ $("#announcer").textContent=`Learning control failed: ${e.message}`; }
+    finally{ btn.disabled=false; }
+  });
+});
 
 bindFixtures();
 refresh(true);

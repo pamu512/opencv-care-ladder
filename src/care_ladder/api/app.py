@@ -21,6 +21,13 @@ from care_ladder.channels.dial import StubDialer
 from care_ladder.cloud.sinks import CloudSinks
 from care_ladder.channels.speaker import SpeakerSimulator
 from care_ladder.ladder.orchestrator import run_incident
+from care_ladder.learning.profile import (
+    explain_schedule,
+    freeze_learning,
+    mark_settled,
+    reset_learning,
+    schedule_badge,
+)
 from care_ladder.learning.store import RoutineProfileStore
 from care_ladder.models import AuditEvent, CueEvent
 from care_ladder.plan_loader import load_care_plan
@@ -372,6 +379,47 @@ def create_app(
             if contact and contact.get("phone_e164"):
                 contact["phone_e164"] = _redact(contact["phone_e164"])
         return data
+
+    def _learning_payload(profile) -> dict[str, Any]:
+        effective = profile.suggested_no_movement_timeout_sec
+        return {
+            "subject_key": profile.subject_key,
+            "learning_phase": profile.learning_phase,
+            "frozen": profile.frozen,
+            "confirmed_ok_days": profile.confirmed_ok_days,
+            "settled_after_days": profile.settled_after_days,
+            "suggested_timeout_sec": effective,
+            "usual_still_end_hour": profile.usual_still_end_hour,
+            "badge": schedule_badge(profile),
+            "explain": explain_schedule(profile, effective_timeout_sec=effective),
+        }
+
+    def _demo_profile():
+        plan = load_care_plan(_DEMO_PLAN_PATH)
+        return application.state.profile_store.load(plan.household_id)
+
+    @application.get("/learning")
+    def get_learning() -> dict[str, Any]:
+        """Household RoutineProfile badge + explain (demo household)."""
+        return _learning_payload(_demo_profile())
+
+    @application.post("/learning/freeze")
+    def post_learning_freeze() -> dict[str, Any]:
+        profile = freeze_learning(_demo_profile())
+        application.state.profile_store.save(profile)
+        return _learning_payload(profile)
+
+    @application.post("/learning/reset")
+    def post_learning_reset() -> dict[str, Any]:
+        profile = reset_learning(_demo_profile())
+        application.state.profile_store.save(profile)
+        return _learning_payload(profile)
+
+    @application.post("/learning/mark-settled")
+    def post_learning_mark_settled() -> dict[str, Any]:
+        profile = mark_settled(_demo_profile())
+        application.state.profile_store.save(profile)
+        return _learning_payload(profile)
 
     @application.get("/incidents")
     def list_incidents() -> list[dict[str, Any]]:

@@ -165,6 +165,23 @@ def mark_settled(profile: RoutineProfile) -> RoutineProfile:
     return profile.model_copy(update={"learning_phase": "settled"})
 
 
+def schedule_badge(profile: RoutineProfile) -> str:
+    if profile.frozen:
+        return "Learning frozen"
+    if profile.learning_phase == "settled":
+        return "Schedule settled"
+    return "Learning schedule"
+
+
+def schedule_badge_short(profile: RoutineProfile) -> str:
+    """Fire TV / tight chrome."""
+    if profile.frozen:
+        return "Frozen"
+    if profile.learning_phase == "settled":
+        return "Settled"
+    return "Learning"
+
+
 def explain_schedule(
     profile: RoutineProfile,
     *,
