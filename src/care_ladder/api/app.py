@@ -233,6 +233,8 @@ async def _run_opencv_stillness(store: AuditStore):
     plan = load_care_plan(_DEMO_PLAN_PATH)
     # Short timeout so demo/tests emit no_movement without waiting plan's 900s.
     plan.triggers.no_movement.timeout_sec = 2
+    # Fixture pins the demo clock (2s): spec section 6 - an explicit fixture
+    # timeout overrides learning, so no profile here.
     detector = CueDetector.from_plan(plan, zone_id="living_room")
     # Zone in demo YAML is 640x480; use matching canvas so blob sits in-zone.
     frames = _synthetic_stillness_frames(width=640, height=480)
@@ -376,6 +378,8 @@ async def _run_opencv_pose_person(store: AuditStore):
 
     plan = load_care_plan(_DEMO_PLAN_PATH)
     plan.triggers.no_movement.timeout_sec = 2
+    # Fixture pins the demo clock (2s): spec section 6 - an explicit fixture
+    # timeout overrides learning, so no profile here.
     detector = CueDetector.from_plan(plan, zone_id="living_room")
     detector.person_detector = MPPersonDet(str(_MODEL_PATH), scoreThreshold=0.3)
     detector.pose_model = MPPose(str(_POSE_MODEL_PATH), confThreshold=0.5)
@@ -660,7 +664,7 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
         undecodable/no-cue input."""
         plan = load_care_plan(_DEMO_PLAN_PATH)
         plan.triggers.no_movement.timeout_sec = 2  # demo clock
-        detector = CueDetector.from_plan(plan, zone_id="living_room")
+        detector = CueDetector.from_plan(plan, zone_id="living_room", profile=_demo_profile())
         if _MODEL_PATH.exists():
             from care_ladder.vision.mppersondet import MPPersonDet
             from care_ladder.vision.mppose import MPPose
@@ -744,7 +748,7 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
 
         plan = load_care_plan(_DEMO_PLAN_PATH)
         plan.triggers.no_movement.timeout_sec = min(plan.triggers.no_movement.timeout_sec, 30)
-        detector = CueDetector.from_plan(plan, zone_id="living_room")
+        detector = CueDetector.from_plan(plan, zone_id="living_room", profile=_demo_profile())
         if _MODEL_PATH.exists():
             from care_ladder.vision.mppersondet import MPPersonDet
 

@@ -129,3 +129,51 @@ def test_json_store_safe_keys(tmp_path: Path):
     # sanitized: no path traversal separators survive
     assert "/" not in files[0].name and files[0].name.startswith("_etc_evil") is False
     assert files[0].parent == store.root  # stayed inside the store root
+
+def test_tenant_scoped_subject_keys(tmp_path):
+    """Galuxium hook (spec section 4): tenant_id + monitored id as subject key.
+    JSON store today; Postgres routine_profiles table when tenancy lands."""
+    from care_ladder.learning.store import RoutineProfileJSONStore as S
+
+    store = S(tmp_path / "rp")
+    a = store.get_or_create("tenant-42:monitored-7")
+    b = store.get_or_create("tenant-99:monitored-7")
+    assert a.subject_key != b.subject_key
+    store.save(a)
+    assert store.get("tenant-42:monitored-7").subject_key == "tenant-42:monitored-7"
+    # tenant-99 never saved: get returns None until created
+    assert store.get("tenant-99:monitored-7") is None
+    assert store.get_or_create("tenant-99:monitored-7").confirmed_ok_days == 0
+
+
+def test_ok_day_dedupe_survives_restart(tmp_path):
+    """Two OK resolves on the same calendar day = 1 day bump, even after a
+    save/load round-trip (process restart). Regression: the transient-attr
+    version double-counted after a redeploy."""
+    from care_ladder.learning.store import RoutineProfileJSONStore
+
+    store = RoutineProfileJSONStore(tmp_path / "rp")
+    p1 = store.get_or_create("hh-1")
+    record_incident_outcome(p1, cue_kind="no_movement", cue_start_hour=8,
+                            resolved_ok=True, ok_day="2026-09-27")
+    store.save(p1)
+
+    reloaded = store.get("hh-1")          # simulates a process restart
+    record_incident_outcome(reloaded, cue_kind="no_movement", cue_start_hour=9,
+                            resolved_ok=True, ok_day="2026-09-27")
+    assert reloaded.confirmed_ok_days == 1
+    assert reloaded.last_confirmed_ok_date is not None
+
+
+def test_subject_key_factory():
+    from care_ladder.learning.profile import subject_key
+    import pytest
+
+    assert subject_key(household_id="demo-home-1") == "demo-home-1"
+    assert subject_key(tenant_id="t42", monitored_id="m7") == "t42:m7"
+    assert subject_key(tenant_id="t42") == "t42"
+    assert subject_key(tenant_id="t42", monitored_id="  ") == "t42"
+    with pytest.raises(ValueError):
+        subject_key(household_id="   ")
+    with pytest.raises(ValueError):
+        subject_key()

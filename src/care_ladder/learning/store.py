@@ -33,7 +33,6 @@ class RoutineProfileJSONStore:
             return None
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
-            data.pop("_last_ok_day", None)  # transient; not persisted
             return RoutineProfile.model_validate(data)
         except (json.JSONDecodeError, ValueError):
             return None
@@ -41,7 +40,6 @@ class RoutineProfileJSONStore:
     def save(self, profile: RoutineProfile) -> RoutineProfile:
         p = self._path(profile.subject_key)
         data = profile.model_dump(mode="json")
-        data.pop("_last_ok_day", None)
         p.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
         return profile
 
