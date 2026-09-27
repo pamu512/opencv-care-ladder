@@ -70,3 +70,28 @@ def test_firetv_flow_path_b_occlusion_copy():
         # the TV renders "never claims distress" from this data
         notify = next(e for e in inc["events"] if e["tool"] == "notify_caretaker")
         assert notify["detail"]["basis"] == "camera_health_inform"
+
+def test_firetv_learning_badge_present():
+    from fastapi.testclient import TestClient
+    from care_ladder.api.app import create_app
+    from care_ladder.audit.store import AuditStore
+
+    with TestClient(create_app(store=AuditStore())) as client:
+        html = client.get('/firetv/').text
+        assert 'learnPill' in html
+        assert 'Learning schedule' in html and 'Schedule settled' in html and 'Learning frozen' in html
+        assert '/learning/amazon-demo-1' in html
+
+
+def test_amazon_fixture_carries_learning_detail():
+    from fastapi.testclient import TestClient
+    from care_ladder.api.app import create_app
+    from care_ladder.audit.store import AuditStore
+
+    with TestClient(create_app(store=AuditStore())) as client:
+        client.post('/learning/amazon-demo-1/reset')
+        r = client.post('/demo/run', json={'fixture': 'alexa_path_a'})
+        inc = client.get(f"/incidents/{r.json()['incident_id']}").json()
+        learning = inc['cue']['detail'].get('learning')
+        assert learning and learning['learning_phase'] in {'rapid', 'settled'}
+        assert any(e['tool'] == 'routine_profile_update' for e in inc['events'])

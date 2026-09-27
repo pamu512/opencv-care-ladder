@@ -138,6 +138,11 @@ async def _run_no_movement_ok(store: AuditStore):
     return incident
 
 
+def _amazon_profile():
+    """RoutineProfile for the Amazon demo household (spec 2026-09-27)."""
+    return _LEARNING_STORE.get_or_create("amazon-demo-1")
+
+
 async def _run_alexa_path_a(store: AuditStore):
     """Amazon Path A: stillness cue -> Alexa+ check-in x2 silence -> wait 45s ->
     notify caretaker -> request_call (simulated) -> emergency fail-closed."""
@@ -147,6 +152,7 @@ async def _run_alexa_path_a(store: AuditStore):
     dialer = StubDialer(behavior={})
     incident = await run_incident(
         cue=cue, plan=plan, speaker=speaker, dialer=dialer,
+        routine_profile=_amazon_profile(),
         pre_event_frames=[], store=store, now=DEMO_NOW,
     )
     return incident
@@ -160,6 +166,7 @@ async def _run_alexa_path_a_ok(store: AuditStore):
     dialer = StubDialer(behavior={})
     incident = await run_incident(
         cue=cue, plan=plan, speaker=speaker, dialer=dialer,
+        routine_profile=_amazon_profile(),
         pre_event_frames=[], store=store, now=DEMO_NOW,
     )
     return incident
@@ -175,6 +182,7 @@ async def _run_alexa_path_b(store: AuditStore):
     dialer = StubDialer(behavior={})
     incident = await run_incident(
         cue=cue, plan=plan, speaker=speaker, dialer=dialer,
+        routine_profile=_amazon_profile(),
         pre_event_frames=[], store=store, now=DEMO_NOW,
     )
     return incident

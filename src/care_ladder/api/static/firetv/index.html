@@ -87,6 +87,16 @@
   .status-pill.attend { background: var(--amber-dim); color: var(--amber); border-color: transparent; }
   .status-pill.urgent { background: var(--clay-dim); color: var(--clay); border-color: transparent; }
   .status-pill.info { background: var(--slate-dim); color: var(--slate); border-color: transparent; }
+  .learn-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 6px 14px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 600; letter-spacing: 0.03em;
+    border: 1px solid var(--line); color: var(--ink-60);
+  }
+  .learn-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .learn-pill[data-phase="rapid"] { background: var(--amber-dim); color: var(--amber); border-color: transparent; }
+  .learn-pill[data-phase="settled"] { background: var(--sage-dim); color: var(--sage); border-color: transparent; }
+  .learn-pill[data-phase="frozen"] { color: var(--ink-40); }
   .clock { font-family: var(--font-mono); font-size: 12px; color: var(--ink-40); font-variant-numeric: tabular-nums; }
 
   /* -- Main grid -- */
@@ -283,6 +293,7 @@
       <span class="brand-name">Care Ladder</span>
     </div>
     <span class="top-meta">Meera's home · Fire TV</span>
+    <span class="learn-pill" id="learnPill" hidden></span>
     <div class="top-spacer"></div>
     <div class="status-pill ok" id="statusPill" role="status" aria-live="polite">
       <span class="dot"></span><span id="statusText">Ladder watching</span>
@@ -610,7 +621,23 @@
     } catch { /* backend briefly away; keep current view */ }
   }
 
+  async function refreshLearningBadge() {
+    try {
+      const d = await fetch('/learning/amazon-demo-1').then(r => r.ok ? r.json() : null);
+      const pill = $('learnPill');
+      if (!d) { pill.hidden = true; return; }
+      pill.hidden = false;
+      pill.innerHTML = '<span class="dot"></span>' + (
+        d.frozen ? 'Learning frozen' :
+        d.learning_phase === 'settled' ? 'Schedule settled' : 'Learning schedule');
+      pill.dataset.phase = d.frozen ? 'frozen' : d.learning_phase;
+      pill.title = 'stillness timeout ' + Math.round(d.effective_no_movement_timeout_sec / 60) +
+        'm (plan ' + Math.round(d.plan_timeout_sec / 60) + 'm)';
+    } catch { /* keep hidden */ }
+  }
   setInterval(() => { $('clock').textContent = fmtClock(); }, 1000);
+  refreshLearningBadge();
+  setInterval(() => { if (!document.hidden) refreshLearningBadge(); }, 20000);
   setInterval(() => { if (!document.hidden) refresh(); }, 3000);
   refresh();
 
