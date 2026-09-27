@@ -10,6 +10,14 @@ from typing import Any
 from care_ladder.audit.store import AuditStore
 from care_ladder.channels.dial import StubDialer, next_rung_after_no_answer
 from care_ladder.channels.speaker import SpeakerChannel
+from care_ladder.learning.profile import (
+    effective_no_movement_timeout_sec,
+    explain_schedule,
+    learning_config_from_plan,
+    new_profile,
+    record_incident_outcome,
+)
+from care_ladder.learning.store import RoutineProfileStore
 from care_ladder.models import AuditEvent, CarePlan, CueEvent, Incident, PrivacyMode, Rung
 from care_ladder.privacy import blur_faces, to_silhouette
 
@@ -174,6 +182,7 @@ async def run_incident(
     max_wait_sec: float = 0.05,
     privacy_mode: PrivacyMode = "blur",
     now: datetime | None = None,
+    profile_store: RoutineProfileStore | None = None,
 ) -> Incident:
     """Run the care-plan rung loop for one cue; return an Incident with audit events.
 
@@ -217,6 +226,13 @@ async def run_incident(
     )
 
     events = incident.events
+    clock = now or datetime.now(timezone.utc)
+    learning_cfg = learning_config_from_plan(plan)
+    profile = (
+        profile_store.load(plan.household_id)
+        if profile_store is not None
+        else None
+    )
     cue_detail: dict[str, Any] = {
         "confidence": cue.confidence,
         "detail": cue.detail,
@@ -224,14 +240,28 @@ async def run_incident(
     if privacy is not None:
         cue_detail["privacy"] = privacy
         cue_detail["pre_event_frame_count"] = frame_count
+    if not learning_cfg.enabled:
+        cue_detail["learning_phase"] = "off"
+        cue_detail["effective_timeout_sec"] = int(plan.triggers.no_movement.timeout_sec)
+        cue_detail["explain"] = "learning disabled; plan timeout"
+    else:
+        if profile is None:
+            profile = new_profile(
+                plan.household_id, settled_after_days=learning_cfg.settled_after_days
+            )
+        effective = effective_no_movement_timeout_sec(plan, profile)
+        cue_detail["learning_phase"] = profile.learning_phase
+        cue_detail["frozen"] = profile.frozen
+        cue_detail["effective_timeout_sec"] = effective
+        cue_detail["explain"] = explain_schedule(
+            profile, effective_timeout_sec=effective, still_since=clock
+        )
     _append(
         events,
         tool="cue",
         cue_kind=cue.kind,
         detail=cue_detail,
     )
-
-    clock = now or datetime.now(timezone.utc)
     if (
         plan.quiet_hours is not None
         and plan.quiet_hours.policy == "soft_suppress_non_distress"
@@ -441,6 +471,38 @@ async def run_incident(
 
     if incident.status == "open":
         incident.status = "exhausted"
+
+    if (
+        learning_cfg.enabled
+        and profile_store is not None
+        and profile is not None
+        and incident.status in {"resolved", "exhausted"}
+    ):
+        updated = record_incident_outcome(
+            profile,
+            cue_kind=cue.kind,
+            hour=clock.hour,
+            resolved_ok=incident.status == "resolved",
+            now=clock,
+            plan=plan,
+        )
+        profile_store.save(updated)
+        _append(
+            events,
+            tool="routine_profile_update",
+            cue_kind=cue.kind,
+            detail={
+                "learning_phase": updated.learning_phase,
+                "frozen": updated.frozen,
+                "suggested_timeout_sec": updated.suggested_no_movement_timeout_sec,
+                "confirmed_ok_days": updated.confirmed_ok_days,
+                "explain": explain_schedule(
+                    updated,
+                    effective_timeout_sec=updated.suggested_no_movement_timeout_sec,
+                    still_since=clock,
+                ),
+            },
+        )
 
     if store is not None:
         store.save(incident)

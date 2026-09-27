@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from care_ladder.learning.profile import LearningConfig
+
 
 class Contact(BaseModel):
     display_name: str
@@ -56,6 +58,7 @@ class CarePlan(BaseModel):
     rungs: list[Rung]
     quiet_hours: QuietHours | None = None
     secondary: Contact | None = None
+    learning: LearningConfig = Field(default_factory=LearningConfig)
 
 
 class CueEvent(BaseModel):

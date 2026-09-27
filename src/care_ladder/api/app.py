@@ -21,6 +21,7 @@ from care_ladder.channels.dial import StubDialer
 from care_ladder.cloud.sinks import CloudSinks
 from care_ladder.channels.speaker import SpeakerSimulator
 from care_ladder.ladder.orchestrator import run_incident
+from care_ladder.learning.store import RoutineProfileStore
 from care_ladder.models import AuditEvent, CueEvent
 from care_ladder.plan_loader import load_care_plan
 from care_ladder.vision.cues import CueDetector
@@ -67,7 +68,7 @@ def _incident_summary(incident) -> dict[str, Any]:
     }
 
 
-async def _run_quiet_hours_suppressed(store: AuditStore):
+async def _run_quiet_hours_suppressed(store: AuditStore, profile_store: RoutineProfileStore):
     """Fixture: non-distress cue inside quiet hours -> suppressed (audited)."""
     plan = load_care_plan(_DEMO_PLAN_PATH)
     cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "quiet_hours_suppressed"})
@@ -79,12 +80,12 @@ async def _run_quiet_hours_suppressed(store: AuditStore):
     night = datetime(2026, 9, 11, 23, 30, tzinfo=tz.utc)
     incident = await run_incident(
         cue=cue, plan=plan, speaker=speaker, dialer=dialer,
-        pre_event_frames=[], store=store, now=night,
+        pre_event_frames=[], store=store, now=night, profile_store=profile_store,
     )
     return incident
 
 
-async def _run_no_visibility(store: AuditStore):
+async def _run_no_visibility(store: AuditStore, profile_store: RoutineProfileStore):
     """Fixture: person left the monitored zone -> no_visibility cue."""
     plan = load_care_plan(_DEMO_PLAN_PATH)
     cue = CueEvent(kind="no_visibility", confidence=0.85, detail={"fixture": "no_visibility"})
@@ -92,12 +93,12 @@ async def _run_no_visibility(store: AuditStore):
     dialer = StubDialer(behavior={})
     incident = await run_incident(
         cue=cue, plan=plan, speaker=speaker, dialer=dialer,
-        pre_event_frames=[], store=store, now=DEMO_NOW,
+        pre_event_frames=[], store=store, now=DEMO_NOW, profile_store=profile_store,
     )
     return incident
 
 
-async def _run_no_movement_ok(store: AuditStore):
+async def _run_no_movement_ok(store: AuditStore, profile_store: RoutineProfileStore):
     """Fixture: no_movement cue + verbal OK → resolve without dial (spec §10 Path A)."""
     plan = load_care_plan(_DEMO_PLAN_PATH)
     cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "no_movement_ok"})
@@ -111,11 +112,12 @@ async def _run_no_movement_ok(store: AuditStore):
         pre_event_frames=[],
         store=store,
         now=DEMO_NOW,
+        profile_store=profile_store,
     )
     return incident
 
 
-async def _run_no_movement_silence(store: AuditStore):
+async def _run_no_movement_silence(store: AuditStore, profile_store: RoutineProfileStore):
     """Fixture: no_movement cue + speaker silence → escalate via stub dialer."""
     plan = load_care_plan(_DEMO_PLAN_PATH)
     cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "no_movement_silence"})
@@ -130,6 +132,7 @@ async def _run_no_movement_silence(store: AuditStore):
         pre_event_frames=[],
         store=store,
         now=DEMO_NOW,
+        profile_store=profile_store,
     )
     return incident
 
@@ -148,10 +151,12 @@ def _synthetic_stillness_frames(
     return frames
 
 
-async def _run_opencv_stillness(store: AuditStore):
+async def _run_opencv_stillness(store: AuditStore, profile_store: RoutineProfileStore):
     """Fixture: synthetic frames → CueDetector.observe → run_incident (OpenCV path)."""
     plan = load_care_plan(_DEMO_PLAN_PATH)
     # Short timeout so demo/tests emit no_movement without waiting plan's 900s.
+    # Pin learning off so the detector uses the exact fixture timeout.
+    plan.learning.enabled = False
     plan.triggers.no_movement.timeout_sec = 2
     detector = CueDetector.from_plan(plan, zone_id="living_room")
     # Zone in demo YAML is 640x480; use matching canvas so blob sits in-zone.
@@ -188,11 +193,12 @@ async def _run_opencv_stillness(store: AuditStore):
         store=store,
         privacy_mode="blur",
         now=DEMO_NOW,
+        profile_store=profile_store,
     )
     return incident
 
 
-async def _run_opencv_dnn_person(store: AuditStore):
+async def _run_opencv_dnn_person(store: AuditStore, profile_store: RoutineProfileStore):
     """Fixture: real photo → DNN person detector → zone check → ladder.
 
     Uses tests/fixtures/basketball1.png (OpenCV sample image with a person).
@@ -213,6 +219,7 @@ async def _run_opencv_dnn_person(store: AuditStore):
     from care_ladder.vision.mppersondet import MPPersonDet
 
     plan = load_care_plan(_DEMO_PLAN_PATH)
+    plan.learning.enabled = False
     plan.triggers.no_movement.timeout_sec = 2  # demo clock, not plan's 900s
     detector = CueDetector.from_plan(plan, zone_id="living_room")
     detector.person_detector = MPPersonDet(str(_MODEL_PATH), scoreThreshold=0.3)
@@ -244,6 +251,7 @@ async def _run_opencv_dnn_person(store: AuditStore):
         store=store,
         privacy_mode="silhouette",
         now=DEMO_NOW,
+        profile_store=profile_store,
     )
     return incident
 
@@ -276,7 +284,7 @@ async def _publish_cloud(incident) -> None:
         print(f"WARNING: cloud publish failed for {incident.id}: {exc}")
 
 
-async def _run_opencv_pose_person(store: AuditStore):
+async def _run_opencv_pose_person(store: AuditStore, profile_store: RoutineProfileStore):
     """Fixture: real photo → person ONNX → pose ONNX → torso metrics, no distress.
 
     Standing person: pose runs, torso angle computed, no distress cue; the
@@ -295,6 +303,7 @@ async def _run_opencv_pose_person(store: AuditStore):
     from care_ladder.vision.mppose import MPPose
 
     plan = load_care_plan(_DEMO_PLAN_PATH)
+    plan.learning.enabled = False
     plan.triggers.no_movement.timeout_sec = 2
     detector = CueDetector.from_plan(plan, zone_id="living_room")
     detector.person_detector = MPPersonDet(str(_MODEL_PATH), scoreThreshold=0.3)
@@ -320,6 +329,7 @@ async def _run_opencv_pose_person(store: AuditStore):
     return await run_incident(
         cue=cue, plan=plan, speaker=speaker, dialer=dialer,
         pre_event_frames=[photo], store=store, privacy_mode="silhouette", now=DEMO_NOW,
+        profile_store=profile_store,
     )
 
 
@@ -327,15 +337,20 @@ async def _run_opencv_pose_person(store: AuditStore):
 _UPLOAD_JOBS: dict[str, dict[str, Any]] = {}
 
 
-def create_app(store: AuditStore | None = None) -> FastAPI:
+def create_app(
+    store: AuditStore | None = None,
+    profile_store: RoutineProfileStore | None = None,
+) -> FastAPI:
     """Build FastAPI app with injectable store (tests inject a fresh memory store)."""
     audit = store if store is not None else _default_store()
+    profiles = profile_store if profile_store is not None else RoutineProfileStore()
     application = FastAPI(
         title="Care Ladder",
         description="Incident timeline + demo trigger (reserved phones; emergency fail-closed).",
         version="0.1.0",
     )
     application.state.store = audit
+    application.state.profile_store = profiles
 
     static_dir = Path(__file__).resolve().parent / "static"
     application.mount("/ui", StaticFiles(directory=static_dir, html=True), name="ui")
@@ -504,6 +519,7 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
         detectors → ladder. Returns incident id; raises HTTPException on
         undecodable/no-cue input."""
         plan = load_care_plan(_DEMO_PLAN_PATH)
+        plan.learning.enabled = False
         plan.triggers.no_movement.timeout_sec = 2  # demo clock
         detector = CueDetector.from_plan(plan, zone_id="living_room")
         if _MODEL_PATH.exists():
@@ -566,6 +582,7 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
                 store=store,
                 privacy_mode="blur",
                 now=DEMO_NOW,
+                profile_store=application.state.profile_store,
             )
         )
         asyncio.run(_publish_cloud(incident))
@@ -588,6 +605,8 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
             raise HTTPException(status_code=400, detail="source must be a device index or rtsp/http URL")
 
         plan = load_care_plan(_DEMO_PLAN_PATH)
+        # Live demo cap: pin timeout and learning so the session fires in-window.
+        plan.learning.enabled = False
         plan.triggers.no_movement.timeout_sec = min(plan.triggers.no_movement.timeout_sec, 30)
         detector = CueDetector.from_plan(plan, zone_id="living_room")
         if _MODEL_PATH.exists():
@@ -607,6 +626,7 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
                 store=application.state.store,
                 privacy_mode="silhouette",
                 now=datetime.now(timezone.utc),
+                profile_store=application.state.profile_store,
             )
             await _publish_cloud(incident)
 
@@ -641,20 +661,21 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
                 status_code=400,
                 detail=f"unknown fixture {body.fixture!r}; supported: {sorted(SUPPORTED_FIXTURES)}",
             )
+        profiles = application.state.profile_store
         if body.fixture == "quiet_hours_suppressed":
-            incident = await _run_quiet_hours_suppressed(application.state.store)
+            incident = await _run_quiet_hours_suppressed(application.state.store, profiles)
         elif body.fixture == "no_visibility":
-            incident = await _run_no_visibility(application.state.store)
+            incident = await _run_no_visibility(application.state.store, profiles)
         elif body.fixture == "no_movement_ok":
-            incident = await _run_no_movement_ok(application.state.store)
+            incident = await _run_no_movement_ok(application.state.store, profiles)
         elif body.fixture == "no_movement_silence":
-            incident = await _run_no_movement_silence(application.state.store)
+            incident = await _run_no_movement_silence(application.state.store, profiles)
         elif body.fixture == "opencv_stillness":
-            incident = await _run_opencv_stillness(application.state.store)
+            incident = await _run_opencv_stillness(application.state.store, profiles)
         elif body.fixture == "opencv_dnn_person":
-            incident = await _run_opencv_dnn_person(application.state.store)
+            incident = await _run_opencv_dnn_person(application.state.store, profiles)
         elif body.fixture == "opencv_pose_person":
-            incident = await _run_opencv_pose_person(application.state.store)
+            incident = await _run_opencv_pose_person(application.state.store, profiles)
         else:  # pragma: no cover - guarded by SUPPORTED_FIXTURES
             raise HTTPException(status_code=400, detail="unsupported fixture")
         await _publish_cloud(incident)
