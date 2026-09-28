@@ -32,6 +32,19 @@ def test_firetv_served_with_calm_care_tech_tokens():
         assert "Audit trail" in html
         # privacy: silhouette only, no video element
         assert "<video" not in html
+        # Ambient Hearth hierarchy: presence panel + first-class ladder rail
+        assert 'class="presence"' in html
+        assert 'class="rail"' in html
+        assert "Escalation ladder" in html
+        # six incident phases remain in the TV state machine
+        for phase in ("allclear", "recheck", "checkin", "notify", "occluded", "resolved"):
+            assert phase in html, phase
+        # fonts are actually loaded (not merely named in a fallback stack)
+        assert "@font-face" in html
+        assert "url(" in html
+        # shipping copy: household label stays pinned; other names are scrubbed
+        assert "the resident" in html
+        assert "primary contact" in html
 
 
 def test_firetv_flow_path_a_then_ack():
