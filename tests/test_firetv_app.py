@@ -17,8 +17,10 @@ def test_firetv_served_with_calm_care_tech_tokens():
             assert token in html, token
         # d-pad focus machinery
         assert "spatialMove" in html and "ArrowLeft" in html
-        # states + copy anchors (prototype strings kept verbatim per Q5)
-        assert "Meera's home · Fire TV" in html
+        # states + copy anchors (name-scrubbed to match demo VO)
+        assert "Resident's home · Fire TV" in html
+        assert "Meera" not in html
+        assert "Anoop" not in html
         assert "(555) 010-2276" in html
         assert "Wellness ladder — not a medical device" in html
         assert "Emergency dial off by default" in html
@@ -26,12 +28,27 @@ def test_firetv_served_with_calm_care_tech_tokens():
         assert 'data-fixture="alexa_path_a"' in html
         assert 'data-fixture="alexa_path_b"' in html
         assert "/demo/run" in html and "/incidents" in html
+        # poll the newest household incident (dict insertion order is oldest-first)
+        assert "mine[mine.length - 1]" in html
         # emergency gate present + hard-locked copy
         assert "gateHold" in html and "Hard-locked in this build" in html
         # audit trail section
         assert "Audit trail" in html
         # privacy: silhouette only, no video element
         assert "<video" not in html
+        # Ambient Hearth hierarchy: presence panel + first-class ladder rail
+        assert 'class="presence"' in html
+        assert 'class="rail"' in html
+        assert "Escalation ladder" in html
+        # six incident phases remain in the TV state machine
+        for phase in ("allclear", "recheck", "checkin", "notify", "occluded", "resolved"):
+            assert phase in html, phase
+        # fonts are actually loaded (not merely named in a fallback stack)
+        assert "@font-face" in html
+        assert "url(" in html
+        # shipping copy: resident / primary contact — no personal names
+        assert "the resident" in html
+        assert "primary contact" in html
 
 
 def test_firetv_flow_path_a_then_ack():
@@ -53,10 +70,10 @@ def test_firetv_flow_path_a_then_ack():
 
         # ack from the TV closes the loop
         ack = client.post(f"/incidents/{iid}/ack",
-                          json={"contact": "Anoop", "via": "fire_tv"})
+                          json={"contact": "primary contact", "via": "fire_tv"})
         assert ack.status_code == 200
         inc2 = client.get(f"/incidents/{iid}").json()
-        assert inc2["acked_by"] == "Anoop"
+        assert inc2["acked_by"] == "primary contact"
         assert any(e["tool"] == "notify" and e["detail"].get("action") == "caregiver_ack"
                    for e in inc2["events"])
 
