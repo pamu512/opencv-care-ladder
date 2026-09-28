@@ -18,6 +18,11 @@ from care_ladder.learning.profile import (
     effective_no_movement_timeout_sec,
 )
 from care_ladder.learning.profile import explain as _learning_explain
+from care_ladder.channels.response_intent import (
+    classify_response_intent,
+    intent_label,
+    jump_reason_for_intent,
+)
 from care_ladder.channels.speaker import SpeakerChannel
 from care_ladder.models import AuditEvent, CarePlan, CueEvent, Incident, PrivacyMode, Rung
 from care_ladder.privacy import blur_faces, to_silhouette
@@ -299,6 +304,7 @@ async def run_incident(
     idx = 0
     n = len(plan.rungs)
     skip_next_wait = False
+    notify_basis_override: str | None = None
     while idx < n:
         rung = plan.rungs[idx]
         tool = rung.tool
@@ -459,6 +465,9 @@ async def run_incident(
                 if max_wait_sec >= 0:
                     listen = min(listen, float(max_wait_sec))
                 reply = await speaker.prompt(text, listen)
+                # Always classify from the raw line (fail-closed). A default
+                # SpeakerReply.intent of "unclear" must not mask a real utterance.
+                intent = classify_response_intent(reply.raw)
                 _append(
                     events,
                     tool="alexa_checkin",
@@ -470,24 +479,32 @@ async def run_incident(
                         "prompt": text,
                         "reply_kind": reply.kind,
                         "reply_raw": reply.raw,
+                        "response_intent": intent,
+                        "intent_label": intent_label(intent),
                     },
                 )
-                if reply.kind == "ok":
+                if intent == "clear_ok":
                     incident.status = "resolved"
                     _append(
                         events,
                         tool="resolve",
                         cue_kind=cue.kind,
-                        detail={"reason": "alexa_checkin_ok", "attempt": attempt},
+                        detail={
+                            "reason": "alexa_checkin_ok",
+                            "attempt": attempt,
+                            "response_intent": intent,
+                        },
                     )
                     break
-                if reply.kind == "call_caregiver":
+                if intent == "needs_human" or reply.kind == "call_caregiver":
+                    notify_basis_override = "needs_human"
                     target = _find_notify_index(plan)
+                    reason = jump_reason_for_intent(intent, reply.raw)
                     for k in range(idx + 1, target):
                         _log_jump(
                             events,
                             plan.rungs[k],
-                            reason="call_caregiver",
+                            reason=reason,
                             from_index=idx,
                             to_index=target,
                         )
@@ -539,6 +556,12 @@ async def run_incident(
             channels = list(rung.params.get("channels", ["push_mock", "fire_tv"]))
             contact = _contact_for_role(plan, role)
             inform_only = cue.kind == "no_visibility"
+            if notify_basis_override:
+                basis = notify_basis_override
+            elif inform_only:
+                basis = "camera_health_inform"
+            else:
+                basis = "no_response_escalation"
             _append(
                 events,
                 tool="notify_caretaker",
@@ -548,7 +571,7 @@ async def run_incident(
                     "role": role,
                     "contact": contact.display_name,
                     "channels": channels,
-                    "basis": "camera_health_inform" if inform_only else "no_response_escalation",
+                    "basis": basis,
                     "simulated": True,
                 },
             )

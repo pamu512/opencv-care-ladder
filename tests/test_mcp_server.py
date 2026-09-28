@@ -91,6 +91,21 @@ def test_path_a_via_tool_calls_only():
             "household_id": "amazon-demo-1", "incident_id": iid, "utterance": "I'm fine",
         })
         assert chk["reply_kind"] == "ok"
+        assert chk["response_intent"] == "clear_ok"
+        assert chk["intent_label"] == "Clear OK"
+
+        mixed = call("check_in_prompt", {
+            "household_id": "amazon-demo-1", "incident_id": iid,
+            "utterance": "I'm okay but I think I'm hurt",
+        })
+        assert mixed["response_intent"] == "needs_human"
+        assert mixed["reply_kind"] != "ok"
+
+        groan = call("check_in_prompt", {
+            "household_id": "amazon-demo-1", "incident_id": iid, "utterance": "nngh",
+        })
+        assert groan["response_intent"] == "unclear"
+        assert groan["reply_kind"] == "silence"
 
         res = call("resolve_incident", {
             "household_id": "amazon-demo-1", "incident_id": iid, "reason": "voice_ok",

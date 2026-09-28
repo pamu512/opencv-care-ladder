@@ -29,7 +29,22 @@ def test_simulator_returns_call_caregiver():
 
 
 def test_simulator_ok_variants():
-    for phrase in ["ok", "I'm fine", "yes I'm okay"]:
+    for phrase in ["ok", "I'm fine", "yes I'm okay", "don't worry"]:
         sim = SpeakerSimulator(scripted=[phrase])
         reply = asyncio.run(sim.prompt("Are you okay?", wait_sec=0.1))
         assert reply.kind == "ok", f"expected ok for {phrase!r}, got {reply.kind}"
+        assert reply.intent == "clear_ok"
+
+
+def test_simulator_mixed_hurt_is_not_ok():
+    sim = SpeakerSimulator(scripted=["I'm okay but I think I'm hurt"])
+    reply = asyncio.run(sim.prompt("Are you okay?", wait_sec=0.1))
+    assert reply.kind != "ok"
+    assert reply.intent == "needs_human"
+
+
+def test_simulator_groan_is_silence():
+    sim = SpeakerSimulator(scripted=["nngh"])
+    reply = asyncio.run(sim.prompt("Are you okay?", wait_sec=0.1))
+    assert reply.kind == "silence"
+    assert reply.intent == "unclear"

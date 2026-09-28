@@ -46,6 +46,44 @@ def test_alexa_path_b_never_claims_distress():
             assert "Meera" not in prompt and "Anoop" not in prompt
 
 
+def test_alexa_path_a_soft_ok_fixture():
+    with TestClient(create_app(store=AuditStore())) as client:
+        r = client.post("/demo/run", json={"fixture": "alexa_path_a_soft_ok"})
+        assert r.status_code == 200
+        inc = client.get(f"/incidents/{r.json()['incident_id']}").json()
+        assert inc["status"] == "resolved"
+        chk = next(e for e in inc["events"] if e["tool"] == "alexa_checkin")
+        assert chk["detail"]["response_intent"] == "clear_ok"
+        assert "okay" not in chk["detail"]["reply_raw"].lower()
+        assert "Meera" not in json.dumps(inc) and "Anoop" not in json.dumps(inc)
+
+
+def test_alexa_path_a_needs_human_fixture():
+    with TestClient(create_app(store=AuditStore())) as client:
+        r = client.post("/demo/run", json={"fixture": "alexa_path_a_needs_human"})
+        assert r.status_code == 200
+        inc = client.get(f"/incidents/{r.json()['incident_id']}").json()
+        assert inc["status"] != "resolved"
+        chk = next(e for e in inc["events"] if e["tool"] == "alexa_checkin")
+        assert chk["detail"]["response_intent"] == "needs_human"
+        assert chk["detail"]["intent_label"] == "Needs human"
+        notify = next(e for e in inc["events"] if e["tool"] == "notify_caretaker")
+        assert notify["detail"]["basis"] == "needs_human"
+        assert "Meera" not in json.dumps(inc) and "Anoop" not in json.dumps(inc)
+
+
+def test_alexa_path_a_unclear_fixture():
+    with TestClient(create_app(store=AuditStore())) as client:
+        r = client.post("/demo/run", json={"fixture": "alexa_path_a_unclear"})
+        assert r.status_code == 200
+        inc = client.get(f"/incidents/{r.json()['incident_id']}").json()
+        assert inc["status"] != "resolved"
+        checkins = [e for e in inc["events"] if e["tool"] == "alexa_checkin"]
+        assert all(e["detail"]["response_intent"] == "unclear" for e in checkins)
+        assert any(e["tool"] == "notify_caretaker" for e in inc["events"])
+        assert not any(e["tool"] == "resolve" for e in inc["events"])
+
+
 def test_amazon_plan_not_the_opencv_default():
     # the OpenCV fixtures still use demo_home.yaml (Alex/Sam household)
     with TestClient(create_app(store=AuditStore())) as client:

@@ -25,7 +25,10 @@ caregiver surface was a browser tab.
   - never runs a distress wait on a room the camera cannot read),
   `notify_caretaker` (push mock + Fire TV), `request_call` (simulated,
   reserved fictional `(555) 010-2276`, never dials), emergency still
-  fail-closed off.
+  fail-closed off. Check-in replies are classified fail-closed into
+  `clear_ok` / `needs_human` / `unclear` (soft OK without the word “okay”
+  may resolve; mixed hurt and groans never invent OK). Ambient Hearth
+  quotes the raw line plus the intent label.
 - **Self-hosted MCP server** (the Alexa+ track gate): Streamable HTTP per
   MCP spec 2025-11-25+, mounted at `/mcp` inside the same FastAPI app. Seven
   care-flow tools (`start_or_resume_incident`, `check_in_prompt`,
@@ -38,7 +41,8 @@ caregiver surface was a browser tab.
   driving the real API). Silhouette/detection frames only - no live video.
   Runs in the Silk browser on a Fire TV stick or any browser at 1280x720.
 - **Occlusion Path B** - a covered camera is privacy, never distress: hold →
-  ask Meera to move the blanket → inform Anoop on the camera-health basis.
+  ask the resident to move the blanket → inform the primary contact on the
+  camera-health basis.
 
 Run it locally:
 
@@ -49,8 +53,11 @@ Run it locally:
 .venv/bin/python -m care_ladder.mcp_server.alexa_sim --url http://127.0.0.1:8010
 ```
 
-Amazon demo household: `configs/amazon_demo_home.yaml` (Meera monitored,
-Anoop → Priya contacts, stillness 4m). The OpenCV demo plan is unchanged.
+Amazon demo household: `configs/amazon_demo_home.yaml` (Resident monitored,
+primary → secondary contacts, stillness 4m). The OpenCV demo plan is unchanged.
+Demo fixtures: `alexa_path_a` (silence), `alexa_path_a_ok`, `alexa_path_a_soft_ok`
+(“don’t worry”), `alexa_path_a_needs_human` (mixed hurt), `alexa_path_a_unclear`
+(groan), `alexa_path_b` (occlusion).
 
 ## Setup
 

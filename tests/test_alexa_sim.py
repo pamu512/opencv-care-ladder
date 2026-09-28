@@ -37,3 +37,34 @@ def test_sim_silence_path_tools():
     finally:
         server.should_exit = True
         thread.join(timeout=5)
+
+
+def test_sim_needs_human_does_not_resolve():
+    config = uvicorn.Config(
+        create_app(store=AuditStore()), host="127.0.0.1", port=8792, log_level="error"
+    )
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    for _ in range(50):
+        try:
+            urllib.request.urlopen("http://127.0.0.1:8792/plan", timeout=1)
+            break
+        except Exception:
+            time.sleep(0.2)
+    try:
+        log, final = asyncio.run(
+            run_sim(
+                "http://127.0.0.1:8792",
+                cue_kind="no_movement",
+                answer="I'm okay but I think I'm hurt",
+                verbose=False,
+            )
+        )
+        assert any("needs_human" in line for line in log)
+        assert any("notify_caretaker" in line for line in log)
+        assert not any("resolve_incident" in line for line in log)
+        assert final.get("status") != "resolved"
+    finally:
+        server.should_exit = True
+        thread.join(timeout=5)
