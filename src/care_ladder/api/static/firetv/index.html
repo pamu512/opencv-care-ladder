@@ -63,6 +63,8 @@
   }
   .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  /* Silk / author-CSS: a display:flex rule otherwise wins over the hidden attribute */
+  [hidden] { display: none !important; }
 
   .atmo { position: fixed; inset: 0; pointer-events: none; transition: opacity 0.6s ease-out; }
   .atmo-warm {
@@ -398,8 +400,8 @@
         <span class="brand-name">Care Ladder</span>
       </div>
       <span class="top-meta">Meera's home · Fire TV</span>
-      <span class="learn-pill" id="learnPill" hidden></span>
       <div class="top-spacer"></div>
+      <span class="learn-pill" id="learnPill" hidden></span>
       <div class="status-pill ok" id="statusPill" role="status" aria-live="polite">
         <span class="dot" aria-hidden="true"></span><span id="statusText">Ladder watching</span>
       </div>
@@ -557,7 +559,7 @@
       ack: 'var(--sage)', caregiver_ack: 'var(--sage)', notify: 'var(--sage)',
       routine_profile_update: 'var(--ink-40)'
     };
-    $('auditEvents').innerHTML = events.slice(-6).reverse().map((ev, i, arr) => `
+    $('auditEvents').innerHTML = events.slice(-6).map((ev, i, arr) => `
       <span class="a-ev">
         <span class="a-r" style="color:${colors[ev.tool] || 'var(--ink-40)'}">${esc(ev.tool)}</span>
         <span class="a-m">${esc(auditMsg(ev))}</span>
@@ -843,7 +845,7 @@
       const r = await fetch('/incidents');
       const list = await r.json();
       const mine = list.filter(i => i.household_id === state.household);
-      const latest = mine[0] || null;
+      const latest = mine[mine.length - 1] || null;
       if (!latest) { renderIncident(null); return; }
       if (force || latest.id !== state.seenId) {
         state.seenId = latest.id;

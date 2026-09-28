@@ -26,6 +26,8 @@ def test_firetv_served_with_calm_care_tech_tokens():
         assert 'data-fixture="alexa_path_a"' in html
         assert 'data-fixture="alexa_path_b"' in html
         assert "/demo/run" in html and "/incidents" in html
+        # poll the newest household incident (dict insertion order is oldest-first)
+        assert "mine[mine.length - 1]" in html
         # emergency gate present + hard-locked copy
         assert "gateHold" in html and "Hard-locked in this build" in html
         # audit trail section
