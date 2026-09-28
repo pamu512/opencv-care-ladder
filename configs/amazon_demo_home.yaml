@@ -1,16 +1,17 @@
-# Amazon Build, Ship, Shape demo household (PRD 2026-09-26, Meera/Anoop/Priya).
+# Amazon Build, Ship, Shape demo household (PRD 2026-09-26).
+# Picture/VO copy uses resident / primary contact (no personal names).
 # OpenCV demo config (demo_home.yaml) is untouched; this plan drives the
 # Alexa+ check-in ladder: cue -> reperceive -> alexa_checkin x2 -> wait 45s ->
 # notify caretaker -> request_call (optional) -> emergency (off, fail-closed).
 household_id: amazon-demo-1
 caregiver:
-  display_name: Anoop
+  display_name: Primary contact
   phone_e164: "+12125550176"   # (555) 010-2276 - reserved NPA-555-01XX fiction
 secondary:
-  display_name: Priya
+  display_name: Secondary contact
   phone_e164: "+12125550182"   # reserved NPA-555-01XX fiction
 monitored:
-  display_name: Meera
+  display_name: Resident
 zones:
   - id: living_room
     polygon: [[0, 0], [640, 0], [640, 480], [0, 480]]
@@ -30,9 +31,9 @@ rungs:
     tool: alexa_checkin
     params:
       attempts: 2
-      prompt_1: "Meera, are you okay?"
-      prompt_2: "Meera, it's Anoop's Care Ladder - can you hear me?"
-      occlusion_prompt: "Meera, the camera is covered - could you move the blanket?"
+      prompt_1: "Resident, are you okay?"
+      prompt_2: "Resident, it's the primary contact's Care Ladder - can you hear me?"
+      occlusion_prompt: "Resident, the camera is covered - could you move the blanket?"
   - id: wait_window
     tool: wait_window
     params: { sec: 45 }

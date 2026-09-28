@@ -20,6 +20,12 @@ def test_alexa_path_a_full_ladder():
         assert "request_call" in tools
         assert "dial_contact" not in tools  # Amazon path never dials for real
         assert inc["household_id"] == "amazon-demo-1"
+        checkins = [e for e in inc["events"] if e["tool"] == "alexa_checkin"]
+        assert checkins, "Path A must quote Alexa+ prompts on the TV transcript"
+        for ev in checkins:
+            prompt = ev["detail"]["prompt"]
+            assert "Meera" not in prompt and "Anoop" not in prompt
+            assert "resident" in prompt.lower() or "primary contact" in prompt.lower()
 
 
 def test_alexa_path_b_never_claims_distress():
@@ -35,6 +41,9 @@ def test_alexa_path_b_never_claims_distress():
         # occlusion prompt was the blanket ask, not a distress prompt
         checkins = [e for e in inc["events"] if e["tool"] == "alexa_checkin"]
         assert any("blanket" in e["detail"]["prompt"] for e in checkins)
+        for ev in checkins:
+            prompt = ev["detail"]["prompt"]
+            assert "Meera" not in prompt and "Anoop" not in prompt
 
 
 def test_amazon_plan_not_the_opencv_default():

@@ -399,7 +399,7 @@
         </div>
         <span class="brand-name">Care Ladder</span>
       </div>
-      <span class="top-meta">Meera's home · Fire TV</span>
+      <span class="top-meta">Resident's home · Fire TV</span>
       <div class="top-spacer"></div>
       <span class="learn-pill" id="learnPill" hidden></span>
       <div class="status-pill ok" id="statusPill" role="status" aria-live="polite">
@@ -830,7 +830,7 @@
     try {
       const r = await fetch(`/incidents/${iid}/ack`, { method: 'POST',
         headers: {'content-type':'application/json'},
-        body: JSON.stringify({ contact: 'Anoop', via: 'fire_tv' }) });
+        body: JSON.stringify({ contact: 'primary contact', via: 'fire_tv' }) });
       if (r.ok) { toast('Incident acknowledged · trail preserved'); await refresh(true); }
       else toast('Ack failed');
     } catch (e) { toast('Ack failed: ' + e.message); }
