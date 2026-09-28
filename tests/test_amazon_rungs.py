@@ -58,6 +58,48 @@ def test_ok_on_attempt_2_resolves_without_notify(plan):
     assert len(checkins) == 2
     assert checkins[1].detail["attempt"] == 2
     assert checkins[1].detail["reply_kind"] == "ok"
+    assert checkins[1].detail["response_intent"] == "clear_ok"
+    assert checkins[1].detail["intent_label"] == "Clear OK"
+
+
+def test_soft_ok_without_okay_resolves(plan):
+    inc = _run(
+        CueEvent(kind="no_movement", confidence=0.9, detail={}), plan, ["don't worry"]
+    )
+    assert inc.status == "resolved"
+    assert "notify_caretaker" not in _tools(inc)
+    chk = next(e for e in inc.events if e.tool == "alexa_checkin")
+    assert chk.detail["response_intent"] == "clear_ok"
+    assert chk.detail["reply_raw"] == "don't worry"
+
+
+def test_mixed_hurt_does_not_clear_and_notifies(plan):
+    inc = _run(
+        CueEvent(kind="no_movement", confidence=0.9, detail={}),
+        plan,
+        ["I'm okay but I think I'm hurt"],
+    )
+    assert inc.status != "resolved"
+    assert "notify_caretaker" in _tools(inc)
+    chk = next(e for e in inc.events if e.tool == "alexa_checkin")
+    assert chk.detail["response_intent"] == "needs_human"
+    assert chk.detail["intent_label"] == "Needs human"
+    notify = next(e for e in inc.events if e.tool == "notify_caretaker")
+    assert notify.detail["basis"] == "needs_human"
+    jump = [e for e in inc.events if e.tool == "jump"]
+    assert jump and jump[0].detail["reason"] == "needs_human"
+
+
+def test_unclear_groan_reasks_then_escalates(plan):
+    inc = _run(
+        CueEvent(kind="no_movement", confidence=0.9, detail={}), plan, ["nngh", "ugh"]
+    )
+    assert inc.status != "resolved"
+    checkins = [e for e in inc.events if e.tool == "alexa_checkin"]
+    assert len(checkins) == 2
+    assert all(e.detail["response_intent"] == "unclear" for e in checkins)
+    assert "notify_caretaker" in _tools(inc)
+    assert not any(e.tool == "resolve" for e in inc.events)
 
 
 def test_silence_advances_to_notify_then_call(plan):

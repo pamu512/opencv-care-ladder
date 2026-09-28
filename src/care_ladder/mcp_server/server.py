@@ -91,14 +91,26 @@ def start_or_resume_incident(
 def check_in_prompt(household_id: str, incident_id: str, utterance: str) -> dict[str, Any]:
     """Record the monitored person's utterance from a voice check-in.
 
-    The Alexa+ agent calls this after each TTS attempt; classify_utterance
-    maps it to ok / call_caregiver / silence.
+    The Alexa+ agent calls this after each TTS attempt. Fail-closed intent
+    (clear_ok / needs_human / unclear) is the gate; reply_kind stays as the
+    legacy ok / call_caregiver / silence mapping.
     """
     _PENDING_ANSWERS[_session_key(household_id, incident_id)] = utterance
-    from care_ladder.channels.speaker import classify_utterance
+    from care_ladder.channels.response_intent import (
+        classify_response_intent,
+        intent_label,
+        intent_to_reply_kind,
+    )
 
-    kind = classify_utterance(utterance)
-    return {"incident_id": incident_id, "reply_kind": kind, "raw": utterance}
+    intent = classify_response_intent(utterance)
+    kind = intent_to_reply_kind(intent, utterance)
+    return {
+        "incident_id": incident_id,
+        "reply_kind": kind,
+        "response_intent": intent,
+        "intent_label": intent_label(intent),
+        "raw": utterance,
+    }
 
 
 @mcp.tool()

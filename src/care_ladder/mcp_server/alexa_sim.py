@@ -62,7 +62,12 @@ async def run_sim(
                     {"household_id": hh, "incident_id": iid, "utterance": answer},
                     log,
                 )
-                if chk.get("reply_kind") == "ok":
+                intent = chk.get("response_intent")
+                log.append(
+                    f"ALEXA+ intent {intent} ({chk.get('intent_label')}) "
+                    f"raw={chk.get('raw')!r}"
+                )
+                if intent == "clear_ok":
                     final = await _call(
                         session,
                         "resolve_incident",
@@ -70,6 +75,21 @@ async def run_sim(
                         log,
                     )
                     return log, final
+                if intent == "needs_human":
+                    await _call(
+                        session,
+                        "notify_caretaker",
+                        {"household_id": hh, "incident_id": iid},
+                        log,
+                    )
+                    status = await _call(
+                        session,
+                        "get_incident_status",
+                        {"household_id": hh, "incident_id": iid},
+                        log,
+                    )
+                    return log, status
+                # unclear: same as no clear answer — fall through to notify
 
             # silence path: wait window closes -> notify -> offer call
             status = await _call(
@@ -90,7 +110,7 @@ def main() -> int:
     parser.add_argument("--url", default="http://127.0.0.1:8000", help="API base URL")
     parser.add_argument("--cue", default="no_movement",
                         choices=["no_movement", "no_visibility", "distress_heuristic"])
-    parser.add_argument("--answer", default="", help="Meera's scripted utterance ('' = silence)")
+    parser.add_argument("--answer", default="", help="Resident scripted utterance ('' = silence)")
     args = parser.parse_args()
     log, final = asyncio.run(run_sim(args.url, cue_kind=args.cue, answer=args.answer))
     print("---")

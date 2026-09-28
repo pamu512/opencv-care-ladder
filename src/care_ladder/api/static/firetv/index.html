@@ -232,6 +232,16 @@
   .t-who { font-size: 11.5px; color: var(--ink-40); }
   .t-what { font-size: 14.5px; line-height: 1.35; }
   .t-line.silence .t-what { color: var(--ink-60); font-style: italic; }
+  .t-intent {
+    margin-top: 3px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .t-intent.ok { color: var(--sage); }
+  .t-intent.human { color: var(--clay); }
+  .t-intent.unclear { color: var(--amber); }
   .t-empty { font-size: 14px; color: var(--ink-70); font-style: italic; line-height: 1.5; }
 
   .rail {
@@ -478,6 +488,9 @@
     <div class="console-hint">Drive the ladder end-to-end through the real orchestrator. Arrow keys + Enter move the UI like a Fire TV remote.</div>
     <button class="console-btn" id="cCue" data-fixture="alexa_path_a"><b>Path A · stillness cue</b><span>no_movement · silence escalates to notify</span></button>
     <button class="console-btn" id="cAnswer" data-fixture="alexa_path_a_ok"><b>Resident answers OK</b><span>check-in resolves without escalation</span></button>
+    <button class="console-btn" id="cSoftOk" data-fixture="alexa_path_a_soft_ok"><b>Soft OK · no “okay”</b><span>don’t worry · Clear OK · ladder stands down</span></button>
+    <button class="console-btn" id="cNeedsHuman" data-fixture="alexa_path_a_needs_human"><b>Mixed hurt reply</b><span>okay but hurt · Needs human · does not clear</span></button>
+    <button class="console-btn" id="cUnclear" data-fixture="alexa_path_a_unclear"><b>Unclear groan</b><span>nngh · Unclear · re-ask then notify</span></button>
     <button class="console-btn" id="cOccluded" data-fixture="alexa_path_b"><b>Path B · camera occluded</b><span>blanket over the lens · never claims distress</span></button>
     <button class="console-btn" id="cReset"><b>Back to all clear</b><span>standby view</span></button>
   </div>
@@ -569,7 +582,7 @@
     const d = ev.detail || {};
     switch (ev.tool) {
       case 'cue': return `${ev.cue_kind || ''} cue`;
-      case 'alexa_checkin': return `attempt ${d.attempt || 1} · ${d.reply_kind === 'ok' ? 'answered' : 'no speech'}`;
+      case 'alexa_checkin': return `attempt ${d.attempt || 1} · ${d.intent_label || (d.reply_kind === 'ok' ? 'answered' : 'no speech')}`;
       case 'wait_window': return `wait closed · ${d.sec || 45}s`;
       case 'notify_caretaker': return `caretaker notified · ${(d.channels || []).join(' + ')}`;
       case 'request_call': return `call requested · simulated`;
@@ -586,16 +599,20 @@
       body.innerHTML = '<div class="t-empty" id="tEmpty">No check-in running.</div>';
       return;
     }
+    const intentCls = (intent) => intent === 'clear_ok' ? 'ok' : intent === 'needs_human' ? 'human' : 'unclear';
     const lines = checkins.map(e => {
       const d = e.detail || {};
       const prompt = `<div class="t-line"><span class="t-who">Alexa+</span><span class="t-what">"${esc(d.prompt || 'Are you okay?')}"</span></div>`;
-      const reply = d.reply_kind === 'ok'
-        ? `<div class="t-line"><span class="t-who">Resident</span><span class="t-what">"${esc(d.reply_raw || "I'm ok")}"</span></div>`
-        : (d.reply_raw ? `<div class="t-line silence"><span class="t-who">Resident</span><span class="t-what">${esc(d.reply_raw)}</span></div>` : '');
-      return prompt + reply;
+      if (!d.reply_raw) return prompt;
+      const label = d.intent_label || '';
+      const badge = label ? `<span class="t-intent ${intentCls(d.response_intent)}">${esc(label)}</span>` : '';
+      const quiet = d.response_intent === 'unclear';
+      return prompt + `<div class="t-line${quiet ? ' silence' : ''}"><span class="t-who">Resident</span><span class="t-what">"${esc(d.reply_raw)}"</span>${badge}</div>`;
     }).join('');
     const resolved = (inc.events || []).some(e => e.tool === 'resolve');
-    const silenceLine = resolved ? '' : '<div class="t-line silence"><span class="t-who">—</span><span class="t-what">silence</span></div>';
+    const last = checkins[checkins.length - 1];
+    const lastRaw = last && last.detail && last.detail.reply_raw;
+    const silenceLine = (!resolved && !lastRaw) ? '<div class="t-line silence"><span class="t-who">—</span><span class="t-what">silence</span></div>' : '';
     body.innerHTML = lines + silenceLine;
   }
 
@@ -753,8 +770,18 @@
       setGlow('clay');
       setPresenceArt('bust');
       setPill('urgent', 'Calling primary'); setChip('urgent', 'Rung 4 · Notify caretaker');
-      $('heroTitle').textContent = 'The resident has not responded · calling the primary contact';
-      $('heroSub').textContent = 'Two voice attempts · 45 seconds of silence · the primary contact is being informed now.';
+      const lastChk = [...(inc.events || [])].reverse().find(e => e.tool === 'alexa_checkin');
+      const lastIntent = lastChk && lastChk.detail && lastChk.detail.response_intent;
+      if (lastIntent === 'needs_human') {
+        $('heroTitle').textContent = 'The resident answered — still needs a human';
+        $('heroSub').textContent = 'Reply is mixed or concerning · the ladder did not clear · the primary contact is being informed.';
+      } else if (lastIntent === 'unclear') {
+        $('heroTitle').textContent = 'The reply was unclear · calling the primary contact';
+        $('heroSub').textContent = 'No clear answer after the voice check-in · the primary contact is being informed now.';
+      } else {
+        $('heroTitle').textContent = 'The resident has not responded · calling the primary contact';
+        $('heroSub').textContent = 'Two voice attempts · 45 seconds of silence · the primary contact is being informed now.';
+      }
       $('pushNote').hidden = false;
       $('pushText').textContent = 'Push sent to the primary contact\'s phone · this TV · ' + fmtClock();
       $('silLabel').textContent = 'Silhouette · processed on device';

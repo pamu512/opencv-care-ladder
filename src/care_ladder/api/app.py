@@ -43,6 +43,9 @@ SUPPORTED_FIXTURES = frozenset(
     {
         "alexa_path_a",
         "alexa_path_a_ok",
+        "alexa_path_a_soft_ok",
+        "alexa_path_a_needs_human",
+        "alexa_path_a_unclear",
         "alexa_path_b",
         "quiet_hours_suppressed",
         "no_visibility",
@@ -161,7 +164,7 @@ async def _run_alexa_path_a(store: AuditStore):
 
 
 async def _run_alexa_path_a_ok(store: AuditStore):
-    """Amazon Path A variant: Meera answers OK on the second attempt."""
+    """Amazon Path A variant: resident answers OK on the second attempt."""
     plan = load_care_plan(_AMAZON_PLAN_PATH)
     cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "alexa_path_a_ok"})
     speaker = SpeakerSimulator(scripted=["", "I'm ok, just resting"])
@@ -173,6 +176,54 @@ async def _run_alexa_path_a_ok(store: AuditStore):
         pre_event_frames=[], store=store, now=DEMO_NOW,
     )
     _LEARNING_STORE.save(profile)  # persist learning update (spec section 5)
+    return incident
+
+
+async def _run_alexa_path_a_soft_ok(store: AuditStore):
+    """Path A: soft OK without the word okay — don't worry / leave me alone."""
+    plan = load_care_plan(_AMAZON_PLAN_PATH)
+    cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "alexa_path_a_soft_ok"})
+    speaker = SpeakerSimulator(scripted=["don't worry"])
+    dialer = StubDialer(behavior={})
+    profile = _amazon_profile()
+    incident = await run_incident(
+        cue=cue, plan=plan, speaker=speaker, dialer=dialer,
+        routine_profile=profile,
+        pre_event_frames=[], store=store, now=DEMO_NOW,
+    )
+    _LEARNING_STORE.save(profile)
+    return incident
+
+
+async def _run_alexa_path_a_needs_human(store: AuditStore):
+    """Path A: mixed/concerning reply — do not clear; raise notify."""
+    plan = load_care_plan(_AMAZON_PLAN_PATH)
+    cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "alexa_path_a_needs_human"})
+    speaker = SpeakerSimulator(scripted=["I'm okay but I think I'm hurt"])
+    dialer = StubDialer(behavior={})
+    profile = _amazon_profile()
+    incident = await run_incident(
+        cue=cue, plan=plan, speaker=speaker, dialer=dialer,
+        routine_profile=profile,
+        pre_event_frames=[], store=store, now=DEMO_NOW,
+    )
+    _LEARNING_STORE.save(profile)
+    return incident
+
+
+async def _run_alexa_path_a_unclear(store: AuditStore):
+    """Path A: groan / empty ASR — same as no clear answer; never invent OK."""
+    plan = load_care_plan(_AMAZON_PLAN_PATH)
+    cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "alexa_path_a_unclear"})
+    speaker = SpeakerSimulator(scripted=["nngh", "ugh"])
+    dialer = StubDialer(behavior={})
+    profile = _amazon_profile()
+    incident = await run_incident(
+        cue=cue, plan=plan, speaker=speaker, dialer=dialer,
+        routine_profile=profile,
+        pre_event_frames=[], store=store, now=DEMO_NOW,
+    )
+    _LEARNING_STORE.save(profile)
     return incident
 
 
@@ -804,6 +855,12 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
             incident = await _run_alexa_path_a(application.state.store)
         elif body.fixture == "alexa_path_a_ok":
             incident = await _run_alexa_path_a_ok(application.state.store)
+        elif body.fixture == "alexa_path_a_soft_ok":
+            incident = await _run_alexa_path_a_soft_ok(application.state.store)
+        elif body.fixture == "alexa_path_a_needs_human":
+            incident = await _run_alexa_path_a_needs_human(application.state.store)
+        elif body.fixture == "alexa_path_a_unclear":
+            incident = await _run_alexa_path_a_unclear(application.state.store)
         elif body.fixture == "alexa_path_b":
             incident = await _run_alexa_path_b(application.state.store)
         elif body.fixture == "quiet_hours_suppressed":
