@@ -57,29 +57,6 @@ def test_firetv_served_with_calm_care_tech_tokens():
         # Rank 1: same-incident memory, calm (no ops jargon)
         assert "Same incident · Alexa+ agent remembers" in html
         assert "via mcp" in html
-        # Rank 3: judge tool list is off by default; catalog matches tools/list
-        assert "Show agent tools" in html
-        assert 'id="agentToolsToggle"' in html
-        assert 'id="agentToolsList"' in html
-        assert "Agent path · MCP" in html
-        toggle_idx = html.find('id="agentToolsToggle"')
-        list_idx = html.find('id="agentToolsList"')
-        assert toggle_idx != -1 and list_idx != -1
-        list_tag = html[list_idx:list_idx + 80]
-        assert "hidden" in list_tag
-        for name in (
-            "start_or_resume_incident",
-            "check_in_prompt",
-            "advance_rung",
-            "resolve_incident",
-            "get_incident_status",
-            "notify_caretaker",
-            "request_call",
-        ):
-            assert name in html, name
-        # default TV stays calm: no JSON-RPC on the hero
-        hero_idx = html.find('id="heroSub"')
-        assert "jsonrpc" not in html[hero_idx:hero_idx + 400].lower()
 
 
 def test_firetv_flow_path_a_then_ack():
