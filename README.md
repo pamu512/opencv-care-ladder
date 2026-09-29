@@ -37,7 +37,7 @@ never touches rung order or the fail-closed emergency gate. See
    - `reperceive` → confirm / stub re-check (occlusion holds as camera-health)
    - `speaker_prompt` → smart-speaker simulator “Are you okay?” (or “clear the lens?” on occlusion)
    - `wait` → listen / settle window (bounded in demo; interruptible by Acknowledge)
-   - `notify_caretaker` → in-console notify + optional await; one-tap Acknowledge stands the ladder down
+   - `notify_caretaker` → family **BotThread** page (Telegram inform card `1|2|3`, or FakeTelegram stub) + console fallback; Acknowledge or Telegram ack stands the ladder down
    - `dial_contact` → stub dial caregiver / secondary
    - `emergency` → **fail-closed** unless `params.enabled: true` (demo YAML keeps it `false`; even if enabled, code audits only and **never** places a real 911 call)
 3. **Branching from cue + replies** (what judges see in the timeline):
@@ -55,6 +55,7 @@ Demo fixtures:
 - `no_movement_ok` - injects a `no_movement` cue with a verbal **"I'm fine"** speaker reply (spec §10 Path A): incident resolves at the check-in rung, no dial, no emergency.
 - `no_movement_silence` - injects a `no_movement` cue with an empty speaker script (silence) so the ladder escalates through notify + dial stubs.
 - `path_b_inflight` - same cue, left **open** on notify so Acknowledge can stand the ladder down mid-flight (`caregiver_ack`).
+- `family_paged_inflight` - silence path left **open** in BotThread `family_paged` so Telegram webhook or console Acknowledge can stop dial.
 - `speaker_soft_ok` / `speaker_needs_human` - same stillness cue, different intent (`clear_ok` vs `needs_human`) and therefore different next tools.
 - `opencv_occlusion` - **covered-lens frames** through `CueDetector` → `camera_occlusion` → ask to clear the lens → inform caretaker (no distress, no dial). UI label: **No reading · lens covered**.
 - `opencv_stillness` - feeds **synthetic numpy frames** through `CueDetector.observe` (OpenCV), then `run_incident`; audit cue is tagged `source: opencv_cue_detector`.
@@ -111,15 +112,28 @@ Returns `{"incident_id":"<id>"}`.
 
 ### 2b. Or use the caregiver console UI
 
-Open **http://127.0.0.1:8000/ui/** - caregiver console with a collapsible **Demo scenarios**
-strip (open by default). Status language is Calm Care-Tech (Care plan active /
-Checking on Pat / Camera blocked / Resolved). Each incident answers what vision
-knew, what we did, how long, and who acked — plus the adaptive **Learning schedule**
-badge and explain line.
+Open **http://127.0.0.1:8000/ui/** - **setup + day archive** console. The **Demo scenarios**
+strip is collapsed by default. A read-only **Family chat (mirror)** panel shows BotThread
+state and the last inform card (`GET /family/runtime`, source `stub|live|demo_fixture`).
+Acknowledge on an incident card remains a secondary ack source. Status language is Calm
+Care-Tech (Care plan active / Checking on Pat / Camera blocked / Resolved).
+
+### Telegram BotThread (optional live)
+
+Family page after speaker silence: `idle → speaker_window → family_paged → pressure → calling_N → closed`.
+Without credentials the runtime stays on **FakeTelegram / stub** (CI and CloudFront stay deterministic).
+
+```bash
+export TELEGRAM_BOT_TOKEN=...   # opt-in live Bot API
+export TELEGRAM_CHAT_ID=...     # family chat
+```
+
+Webhook: `POST /telegram/webhook` (callback `ack:N` or text `1|2|3`). Unconfigured: `200 {"ok":false,"reason":"telegram_not_configured"}`. Vision still picks the next tools; Telegram is confirm-before-escalate, not a replacement for OpenCV cues.
 
 - **Path A: verbal OK** (`no_movement_ok`) - check-in clears, no dial.
 - **Path B: silence → escalate** (`no_movement_silence`) - notify then dial stubs, jumps logged.
 - **Path B: ack mid-flight** (`path_b_inflight`) - Acknowledge stands the ladder down.
+- **Family page · leave open** (`family_paged_inflight`) - BotThread `family_paged`; webhook or Acknowledge stops dial.
 - **Camera blocked** (`opencv_occlusion`) - covered lens is camera-health, not distress.
 - **OpenCV stillness** (`opencv_stillness`) - synthetic frames through `CueDetector`.
 

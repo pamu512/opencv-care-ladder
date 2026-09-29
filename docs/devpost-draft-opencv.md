@@ -141,12 +141,14 @@ OpenCV 5 perception emits structured cues (`no_movement`, `no_visibility`, `came
 1. Re-perceive (confirm the cue; a covered lens holds as camera-health, not distress)
 2. Smart-speaker check-in ("Are you okay?" or "Could you clear the lens?")
 3. Wait / listen (Acknowledge can stand the ladder down mid-flight)
-4. Notify caregiver (console; inform-only on occlusion)
+4. Notify caregiver / family BotThread (Telegram inform card with 1|2|3, or FakeTelegram stub; console Acknowledge is a secondary ack; inform-only on occlusion)
 5. Dial primary caregiver (stub)
 6. Dial secondary (stub)
 7. Emergency rung (**fail-closed** by default; even enabled, code audits only and never places a real 911 call)
 
 **Agentic Vision evidence:** the same stillness cue resolves with no dial on a `clear_ok` reply (Path A, including soft OK like "don't worry"), escalates on silence (Path B), and jumps to a human on `needs_human` (mixed hurt never invents OK). A covered camera is a different cue (`camera_occlusion`) and a different tool path: ask to clear the lens, inform the caretaker, never claim distress. Every jump is logged with `from_index` / `to_index` / `reason` on the caregiver timeline.
+
+**Family Telegram (confirm-before-escalate, not the vision claim):** after speaker silence the family gets a BotThread inform card (inline 1|2|3 or reply `1`/`2`/`3`). Any family or console ack stops dial. OpenCV cues still choose the next tools; Telegram is the family page after the speaker, and without `TELEGRAM_BOT_TOKEN` the demo stays on an honest stub / chat mirror.
 
 Privacy is enforced at attach: blur or silhouette runs **before** any pre-event frame is stored or served. Raw identifiable video never leaves the device path.
 

@@ -17,7 +17,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from care_ladder.audit.store import AuditStore
+from care_ladder.channels.bot import BotRegistry, BotState
 from care_ladder.channels.dial import StubDialer
+from care_ladder.channels.telegram_adapter import FakeTelegram, TelegramAdapter, inform_text
 from care_ladder.cloud.sinks import CloudSinks
 from care_ladder.channels.speaker import SpeakerSimulator
 from care_ladder.ladder.orchestrator import run_incident
@@ -51,6 +53,7 @@ SUPPORTED_FIXTURES = frozenset(
         "speaker_soft_ok",
         "speaker_needs_human",
         "path_b_inflight",
+        "family_paged_inflight",
     }
 )
 
@@ -61,6 +64,7 @@ _TOOL_LABELS = {
     "wait": "Listen window",
     "notify_caretaker": "Notify caregiver",
     "notify": "Caregiver note",
+    "bot": "Family chat",
     "dial_contact": "Dial",
     "emergency": "Emergency (fail-closed)",
     "resolve": "Resolve",
@@ -301,6 +305,24 @@ async def _run_path_b_inflight(store: AuditStore, *, max_wait_sec: float = 25.0)
     )
 
 
+async def _run_family_paged_inflight(store: AuditStore, *, max_wait_sec: float = 25.0):
+    """Silence path left open in family_paged with FakeTelegram inform recorded."""
+    plan = load_care_plan(_DEMO_PLAN_PATH)
+    cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "family_paged_inflight"})
+    speaker = SpeakerSimulator(scripted=[""])
+    dialer = StubDialer(behavior={"caregiver": "no_answer", "secondary": "answered"})
+    return await run_incident(
+        cue=cue,
+        plan=plan,
+        speaker=speaker,
+        dialer=dialer,
+        pre_event_frames=[],
+        store=store,
+        now=DEMO_NOW,
+        max_wait_sec=max_wait_sec,
+    )
+
+
 async def _run_no_movement_silence(store: AuditStore):
     """Fixture: no_movement cue + speaker silence → escalate via stub dialer."""
     plan = load_care_plan(_DEMO_PLAN_PATH)
@@ -520,15 +542,30 @@ async def _run_opencv_pose_person(store: AuditStore):
 _UPLOAD_JOBS: dict[str, dict[str, Any]] = {}
 
 
+def _bind_family_channel(store: AuditStore) -> tuple[TelegramAdapter, BotRegistry]:
+    """Stub FakeTelegram unless TELEGRAM_BOT_TOKEN is set (CI never needs live creds)."""
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    adapter = getattr(store, "telegram", None)
+    if adapter is None:
+        adapter = TelegramAdapter(token=token) if token else FakeTelegram()
+    registry = getattr(store, "bot_registry", None) or BotRegistry()
+    store.telegram = adapter
+    store.bot_registry = registry
+    return adapter, registry
+
+
 def create_app(store: AuditStore | None = None) -> FastAPI:
     """Build FastAPI app with injectable store (tests inject a fresh memory store)."""
     audit = store if store is not None else _default_store()
+    telegram, bot_registry = _bind_family_channel(audit)
     application = FastAPI(
         title="Care Ladder",
         description="Incident timeline + demo trigger (reserved phones; emergency fail-closed).",
         version="0.1.0",
     )
     application.state.store = audit
+    application.state.telegram = telegram
+    application.state.bot_registry = bot_registry
 
     static_dir = Path(__file__).resolve().parent / "static"
     application.mount("/ui", StaticFiles(directory=static_dir, html=True), name="ui")
@@ -598,6 +635,43 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
                 contact["phone_e164"] = _redact(contact["phone_e164"])
         return data
 
+    @application.get("/family/runtime")
+    def family_runtime() -> dict[str, Any]:
+        """Read-only BotThread mirror. Honest about stub vs live Telegram."""
+        adapter: TelegramAdapter = application.state.telegram
+        registry: BotRegistry = application.state.bot_registry
+        token_set = bool(getattr(adapter, "token", None))
+        source = "live" if token_set else "stub"
+        thread = None
+        if registry is not None:
+            thread = registry.open_page() or registry.latest()
+        if thread is not None:
+            incident = application.state.store.get(thread.incident_id)
+            fixture = (incident.cue.detail or {}).get("fixture") if incident else None
+            if not token_set and fixture in {"family_paged_inflight", "path_b_inflight"}:
+                source = "demo_fixture"
+        inform = None
+        sent = getattr(adapter, "sent", None)
+        if sent:
+            last = sent[-1]
+            if isinstance(last, dict):
+                inform = last.get("text")
+        if not inform and thread is not None and thread.inform is not None:
+            inform = inform_text(thread.inform)
+        return {
+            "source": source,
+            "state": thread.state.value if thread is not None else "idle",
+            "incident_id": thread.incident_id if thread is not None else None,
+            "inform_text": inform,
+            "close_reason": thread.close_reason if thread is not None else None,
+            "configured": token_set,
+            "note": (
+                None
+                if token_set
+                else "Telegram is stub-mode. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID for live send."
+            ),
+        }
+
     @application.get("/incidents")
     def list_incidents() -> list[dict[str, Any]]:
         return [_incident_summary(i) for i in application.state.store.list_incidents()]
@@ -640,6 +714,18 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
                 at=now,
             )
         )
+        thread = application.state.bot_registry.get(incident_id)
+        if thread is not None and thread.state is not BotState.closed:
+            thread.ack(source="console", choice=None)
+            last = thread.audit_events()[-1]
+            incident.events.append(
+                AuditEvent(
+                    tool="bot",
+                    cue_kind=incident.cue.kind,
+                    detail=dict(last.get("detail") or {}),
+                    at=last.get("at") or now,
+                )
+            )
         if incident.status == "open":
             incident.status = "resolved"
             incident.events.append(
@@ -657,6 +743,44 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
             "acked_at": now.isoformat(),
             "status": incident.status,
         }
+
+    @application.post("/telegram/webhook")
+    async def telegram_webhook(update: dict[str, Any]) -> dict[str, Any]:
+        """Telegram callback/text ack. Stub mode is honest and never retries-storms."""
+        adapter: TelegramAdapter = application.state.telegram
+        registry: BotRegistry = application.state.bot_registry
+        token_set = bool(getattr(adapter, "token", None))
+        inbox = getattr(adapter, "inbox", None)
+        if isinstance(inbox, list):
+            inbox.append(update)
+        intent = adapter.parse_update(update)
+        thread = registry.open_page() if registry is not None else None
+        if intent is not None and thread is not None:
+            incident = application.state.store.get(thread.incident_id)
+            if incident is not None and incident.status == "open":
+                now = datetime.now(timezone.utc)
+                thread.ack(source=intent.source, choice=intent.choice)
+                last = thread.audit_events()[-1]
+                incident.acked_by = incident.acked_by or "family"
+                incident.acked_at = now
+                incident.events.append(
+                    AuditEvent(
+                        tool="bot",
+                        cue_kind=incident.cue.kind,
+                        detail=dict(last.get("detail") or {}),
+                        at=last.get("at") or now,
+                    )
+                )
+                application.state.store.save(incident)
+                return {
+                    "ok": True,
+                    "applied": True,
+                    "incident_id": incident.id,
+                    "source": "live" if token_set else "stub",
+                }
+        if not token_set:
+            return {"ok": False, "reason": "telegram_not_configured"}
+        return {"ok": True, "applied": False}
 
     @application.get("/incidents/{incident_id}/frames/{index}", response_class=Response)
     def get_incident_frame(incident_id: str, index: int):
@@ -942,6 +1066,34 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
                     break
             if incident is None:
                 raise HTTPException(status_code=500, detail="path_b_inflight failed to open")
+            return DemoRunResponse(incident_id=incident.id)
+        elif body.fixture == "family_paged_inflight":
+            task = asyncio.create_task(
+                _run_family_paged_inflight(application.state.store)
+            )
+            tasks = getattr(application.state, "inflight_tasks", None)
+            if tasks is None:
+                application.state.inflight_tasks = []
+                tasks = application.state.inflight_tasks
+            tasks.append(task)
+            incident = None
+            for _ in range(250):
+                await asyncio.sleep(0.02)
+                opens = [
+                    i
+                    for i in application.state.store.list_incidents()
+                    if i.status == "open"
+                    and (i.cue.detail or {}).get("fixture") == "family_paged_inflight"
+                    and any(
+                        e.tool == "bot" and (e.detail or {}).get("state") == "family_paged"
+                        for e in i.events
+                    )
+                ]
+                if opens:
+                    incident = opens[-1]
+                    break
+            if incident is None:
+                raise HTTPException(status_code=500, detail="family_paged_inflight failed to page")
             return DemoRunResponse(incident_id=incident.id)
         else:  # pragma: no cover - guarded by SUPPORTED_FIXTURES
             raise HTTPException(status_code=400, detail="unsupported fixture")

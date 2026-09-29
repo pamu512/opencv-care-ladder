@@ -38,7 +38,9 @@ rungs:
     params:
       contact: caregiver
       await_sec: 30
-      channels: [console]
+      family_countdown_sec: 30
+      pressure_at_remaining_sec: 15
+      channels: [telegram, console]
   - id: dial_primary
     tool: dial_contact
     params: { contact: caregiver }
