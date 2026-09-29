@@ -113,6 +113,19 @@ class TelegramAdapter:
             return len(self.sent)
         return self._send_live(payload)
 
+    def send_pressure_warn(self, chat_id: str | int, remaining_sec: float) -> int:
+        total = max(0, int(remaining_sec))
+        minutes, seconds = divmod(total, 60)
+        text = (
+            f"Pressure: still no reply. {minutes:02d}:{seconds:02d} left "
+            "before we call the next contact."
+        )
+        recorded = {"chat_id": chat_id, "text": text, "kind": "pressure"}
+        if self.token is None:
+            self.sent.append(recorded)
+            return len(self.sent)
+        return self._send_live({"chat_id": chat_id, "text": text})
+
     def _send_live(self, payload: dict[str, Any]) -> int:
         url = f"{_API_ROOT}/bot{self.token}/sendMessage"
         client = self._client

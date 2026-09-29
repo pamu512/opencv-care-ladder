@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import uuid
 from datetime import datetime, time, timezone
 from typing import Any
@@ -13,7 +14,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from care_ladder.learning.profile import RoutineProfile
 
+from care_ladder.channels.bot import BotRegistry, BotThread, InformCard
 from care_ladder.channels.dial import StubDialer, next_rung_after_no_answer
+from care_ladder.channels.telegram_adapter import AckIntent, FakeTelegram, TelegramAdapter
 from care_ladder.learning.profile import (
     effective_no_movement_timeout_sec,
 )
@@ -123,7 +126,8 @@ def _refresh_ack(incident: Incident, store: AuditStore | None) -> bool:
 
 def _already_resolved_ack(events: list[AuditEvent]) -> bool:
     return any(
-        e.tool == "resolve" and e.detail.get("reason") == "caregiver_ack" for e in events
+        e.tool == "resolve" and e.detail.get("reason") in {"caregiver_ack", "family_ack"}
+        for e in events
     )
 
 
@@ -141,6 +145,178 @@ def _resolve_caregiver_ack(
         cue_kind=cue.kind,
         detail={"reason": "caregiver_ack", "contact": incident.acked_by or "caregiver"},
     )
+
+
+_CUE_CARD_LABEL = {
+    "no_movement": "Stillness",
+    "no_visibility": "No visibility",
+    "distress_heuristic": "Distress check",
+    "camera_occlusion": "Camera health",
+}
+
+
+def _flush_bot_audit(thread: BotThread, events: list[AuditEvent], cue: CueEvent, seen: int) -> int:
+    raw = thread.audit_events()
+    for item in raw[seen:]:
+        at = item.get("at")
+        events.append(
+            AuditEvent(
+                tool="bot",
+                cue_kind=cue.kind,
+                detail=dict(item.get("detail") or {}),
+                at=at if isinstance(at, datetime) else datetime.now(timezone.utc),
+            )
+        )
+    return len(raw)
+
+
+def _pop_telegram_ack(adapter: TelegramAdapter | None) -> AckIntent | None:
+    if adapter is None:
+        return None
+    inbox = getattr(adapter, "inbox", None)
+    if not inbox:
+        return None
+    while inbox:
+        update = inbox.pop(0)
+        intent = adapter.parse_update(update)
+        if intent is not None:
+            return intent
+    return None
+
+
+def _resolve_family_ack(
+    incident: Incident,
+    events: list[AuditEvent],
+    cue: CueEvent,
+    *,
+    source: str,
+    choice: str | None,
+) -> None:
+    incident.status = "resolved"
+    incident.acked_by = incident.acked_by or "family"
+    incident.acked_at = incident.acked_at or datetime.now(timezone.utc)
+    if _already_resolved_ack(events):
+        return
+    detail: dict[str, Any] = {
+        "reason": "family_ack",
+        "contact": incident.acked_by,
+        "source": source,
+    }
+    if choice is not None:
+        detail["choice"] = choice
+    _append(events, tool="resolve", cue_kind=cue.kind, detail=detail)
+
+
+async def _poll_family_ack(
+    incident: Incident,
+    store: AuditStore | None,
+    adapter: TelegramAdapter | None,
+    sec: float,
+) -> tuple[str | None, AckIntent | None, float]:
+    """Poll store ack + Telegram inbox. Returns (kind, intent, slept)."""
+    duration = max(0.0, float(sec))
+    slept = 0.0
+    step = 0.05
+    while True:
+        if _refresh_ack(incident, store) or incident.status == "resolved":
+            return "caregiver_ack", None, slept
+        intent = _pop_telegram_ack(adapter)
+        if intent is not None:
+            return "family_ack", intent, slept
+        if slept >= duration:
+            return None, None, slept
+        chunk = min(step, duration - slept)
+        await asyncio.sleep(chunk)
+        slept += chunk
+
+
+async def _run_family_page(
+    incident: Incident,
+    store: AuditStore | None,
+    events: list[AuditEvent],
+    cue: CueEvent,
+    plan: CarePlan,
+    adapter: TelegramAdapter,
+    registry: BotRegistry,
+    *,
+    family_countdown_sec: float,
+    pressure_at_remaining_sec: float,
+    max_wait_sec: float,
+    inform_only: bool,
+) -> str:
+    """Page family via BotThread. Returns ack | inform_only | timeout."""
+    thread = BotThread(
+        incident_id=incident.id,
+        family_countdown_sec=family_countdown_sec,
+        pressure_at_remaining_sec=pressure_at_remaining_sec,
+    )
+    registry.attach(thread)
+    incident.__dict__["_bot_thread"] = thread
+
+    remaining = max(1, int(round(family_countdown_sec)))
+    card = InformCard(
+        cue_text=_CUE_CARD_LABEL.get(cue.kind, cue.kind.replace("_", " ")),
+        actions=("1", "2", "3"),
+        remaining_sec=remaining,
+        monitored_name=plan.monitored.display_name or "Mom",
+    )
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip() or "stub-family"
+    thread.enter_family_paged(card)
+    adapter.send_inform(chat_id, card)
+    seen = _flush_bot_audit(thread, events, cue, 0)
+    if store is not None:
+        store.save(incident)
+
+    total = max(0.0, float(family_countdown_sec))
+    pressure_rem = max(0.0, float(pressure_at_remaining_sec))
+    pressure_delay = max(0.0, total - pressure_rem)
+    budget = total if max_wait_sec < 0 else min(total, float(max_wait_sec))
+    first = min(pressure_delay, budget)
+    second = min(pressure_rem, max(0.0, budget - first))
+
+    def _apply(kind: str, intent: AckIntent | None) -> None:
+        nonlocal seen
+        if kind == "family_ack" and intent is not None:
+            thread.ack(source=intent.source, choice=intent.choice)
+            seen = _flush_bot_audit(thread, events, cue, seen)
+            _resolve_family_ack(
+                incident, events, cue, source=intent.source, choice=intent.choice
+            )
+            return
+        thread.ack(source="console", choice=None)
+        seen = _flush_bot_audit(thread, events, cue, seen)
+        _resolve_caregiver_ack(incident, events, cue)
+
+    wait_first = total if inform_only else first
+    if inform_only and max_wait_sec >= 0:
+        wait_first = min(wait_first, float(max_wait_sec))
+    kind, intent, _ = await _poll_family_ack(incident, store, adapter, wait_first)
+    if kind is not None:
+        _apply(kind, intent)
+        if store is not None:
+            store.save(incident)
+        return "ack"
+    if inform_only:
+        return "inform_only"
+
+    thread.enter_pressure()
+    adapter.send_pressure_warn(chat_id, pressure_rem)
+    seen = _flush_bot_audit(thread, events, cue, seen)
+    if store is not None:
+        store.save(incident)
+
+    kind, intent, _ = await _poll_family_ack(incident, store, adapter, second)
+    if kind is not None:
+        _apply(kind, intent)
+        if store is not None:
+            store.save(incident)
+        return "ack"
+
+    thread.enter_calling(1)
+    seen = _flush_bot_audit(thread, events, cue, seen)
+    if store is not None:
+        store.save(incident)
+    return "timeout"
 
 
 async def _sleep_or_ack(
@@ -264,6 +440,8 @@ async def run_incident(
     max_wait_sec: float = 0.05,
     privacy_mode: PrivacyMode = "blur",
     now: datetime | None = None,
+    telegram: TelegramAdapter | None = None,
+    bot_registry: BotRegistry | None = None,
 ) -> Incident:
     """Run the care-plan rung loop for one cue; return an Incident with audit events.
 
@@ -515,6 +693,50 @@ async def run_incident(
             if store is not None:
                 store.save(incident)
             await_sec = float(rung.params.get("await_sec", 0) or 0)
+            family_countdown = float(
+                rung.params.get("family_countdown_sec", await_sec) or await_sec
+            )
+            pressure_remaining = float(rung.params.get("pressure_at_remaining_sec", 0) or 0)
+            adapter = telegram or (getattr(store, "telegram", None) if store else None)
+            registry = bot_registry or (getattr(store, "bot_registry", None) if store else None)
+            use_bot = adapter is not None or "telegram" in channels
+            if use_bot:
+                if adapter is None:
+                    adapter = FakeTelegram()
+                if registry is None:
+                    registry = BotRegistry()
+                if store is not None:
+                    store.telegram = adapter
+                    store.bot_registry = registry
+                outcome = await _run_family_page(
+                    incident,
+                    store,
+                    events,
+                    cue,
+                    plan,
+                    adapter,
+                    registry,
+                    family_countdown_sec=family_countdown,
+                    pressure_at_remaining_sec=pressure_remaining,
+                    max_wait_sec=max_wait_sec,
+                    inform_only=inform_only,
+                )
+                if outcome == "ack":
+                    break
+                if inform_only or outcome == "inform_only":
+                    incident.status = "resolved"
+                    _append(
+                        events,
+                        tool="resolve",
+                        cue_kind=cue.kind,
+                        detail={
+                            "reason": "camera_health_informed",
+                            "distress_claimed": False,
+                        },
+                    )
+                    break
+                idx += 1
+                continue
             await _sleep_or_ack(incident, store, await_sec, max_wait_sec)
             if _refresh_ack(incident, store) or incident.status == "resolved":
                 _resolve_caregiver_ack(incident, events, cue)

@@ -36,8 +36,8 @@ class BotThread:
     def __init__(
         self,
         incident_id: str,
-        family_countdown_sec: int,
-        pressure_at_remaining_sec: int,
+        family_countdown_sec: float,
+        pressure_at_remaining_sec: float,
         *,
         now: datetime | None = None,
     ) -> None:
@@ -106,3 +106,22 @@ class BotThread:
 
     def audit_events(self) -> list[dict[str, Any]]:
         return list(self._events)
+
+
+class BotRegistry:
+    """Process-local incident_id → BotThread side-map (no Incident model change)."""
+
+    def __init__(self) -> None:
+        self._threads: dict[str, BotThread] = {}
+
+    def attach(self, thread: BotThread) -> None:
+        self._threads[thread.incident_id] = thread
+
+    def get(self, incident_id: str) -> BotThread | None:
+        return self._threads.get(incident_id)
+
+    def open_page(self) -> BotThread | None:
+        for thread in reversed(list(self._threads.values())):
+            if thread.state in {BotState.family_paged, BotState.pressure}:
+                return thread
+        return None
