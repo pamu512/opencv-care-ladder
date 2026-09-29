@@ -18,9 +18,12 @@ from care_ladder.learning.profile import (
     effective_no_movement_timeout_sec,
 )
 from care_ladder.learning.profile import explain as _learning_explain
+from care_ladder.channels.response_intent import classify_response_intent
 from care_ladder.channels.speaker import SpeakerChannel
 from care_ladder.models import AuditEvent, CarePlan, CueEvent, Incident, PrivacyMode, Rung
 from care_ladder.privacy import blur_faces, to_silhouette
+
+_OCCLUSION_PROMPT = "The camera looks covered. Could you clear the lens?"
 
 
 def _contact_for_role(plan: CarePlan, role: str):
@@ -49,6 +52,7 @@ def _append(
             cue_kind=cue_kind,
             rung_id=rung_id,
             detail=detail or {},
+            at=datetime.now(timezone.utc),
         )
     )
 
@@ -88,6 +92,76 @@ def _find_dial_primary_index(plan: CarePlan) -> int:
         if rung.tool == "dial_contact":
             return i
     raise ValueError("care plan has no dial_contact rung")
+
+
+def _find_human_index(plan: CarePlan) -> int:
+    """Prefer notify-before-dial when a caregiver stand-down rung exists."""
+    for i, rung in enumerate(plan.rungs):
+        if rung.tool == "notify_caretaker":
+            return i
+    return _find_dial_primary_index(plan)
+
+
+def _is_occlusion(cue: CueEvent) -> bool:
+    return cue.kind == "camera_occlusion" or bool(
+        (cue.detail or {}).get("reason") == "lens_covered"
+    )
+
+
+def _refresh_ack(incident: Incident, store: AuditStore | None) -> bool:
+    if incident.acked_by:
+        return True
+    if store is None:
+        return False
+    latest = store.get(incident.id)
+    if latest is not None and latest.acked_by:
+        incident.acked_by = latest.acked_by
+        incident.acked_at = latest.acked_at
+        return True
+    return False
+
+
+def _already_resolved_ack(events: list[AuditEvent]) -> bool:
+    return any(
+        e.tool == "resolve" and e.detail.get("reason") == "caregiver_ack" for e in events
+    )
+
+
+def _resolve_caregiver_ack(
+    incident: Incident,
+    events: list[AuditEvent],
+    cue: CueEvent,
+) -> None:
+    incident.status = "resolved"
+    if _already_resolved_ack(events):
+        return
+    _append(
+        events,
+        tool="resolve",
+        cue_kind=cue.kind,
+        detail={"reason": "caregiver_ack", "contact": incident.acked_by or "caregiver"},
+    )
+
+
+async def _sleep_or_ack(
+    incident: Incident,
+    store: AuditStore | None,
+    sec: float,
+    max_wait_sec: float,
+) -> float:
+    """Bound a wait and stand down immediately if a caregiver acks."""
+    duration = max(0.0, float(sec))
+    if max_wait_sec >= 0:
+        duration = min(duration, float(max_wait_sec))
+    slept = 0.0
+    step = 0.05
+    while slept < duration:
+        if _refresh_ack(incident, store) or incident.status == "resolved":
+            return slept
+        chunk = min(step, duration - slept)
+        await asyncio.sleep(chunk)
+        slept += chunk
+    return slept
 
 
 async def _bounded_sleep(sec: float, max_wait_sec: float) -> float:
@@ -194,9 +268,11 @@ async def run_incident(
     """Run the care-plan rung loop for one cue; return an Incident with audit events.
 
     Rung outcomes:
-    - speaker ``ok`` → resolve
-    - speaker ``call_caregiver`` → jump to dial primary (log skipped rungs)
-    - speaker ``silence`` → continue
+    - speaker ``clear_ok`` / ``ok`` → resolve
+    - speaker ``needs_human`` / ``call_caregiver`` → jump to notify (or dial)
+    - speaker ``unclear`` / ``silence`` → continue
+    - ``notify_caretaker`` + caregiver ack → resolve ``caregiver_ack``
+    - occlusion + silence after notify → inform-only resolve (never distress)
     - dial ``answered`` → resolve
     - dial ``no_answer`` → ``next_rung_after_no_answer`` (log jumps over skipped rungs)
     - ``emergency`` with ``enabled`` not True → fail-closed skip (never real 911)
@@ -265,6 +341,8 @@ async def run_incident(
         cue_kind=cue.kind,
         detail=cue_detail,
     )
+    if store is not None:
+        store.save(incident)
 
     if (
         plan.quiet_hours is not None
@@ -291,23 +369,41 @@ async def run_incident(
     idx = 0
     n = len(plan.rungs)
     skip_next_wait = False
+    last_intent = "unclear"
+    occlusion = _is_occlusion(cue)
     while idx < n:
+        if _refresh_ack(incident, store) or incident.status == "resolved":
+            _resolve_caregiver_ack(incident, events, cue)
+            break
         rung = plan.rungs[idx]
         tool = rung.tool
 
         if tool == "reperceive":
+            detail: dict[str, Any] = {"params": dict(rung.params), "result": "stub_ok"}
+            if occlusion:
+                detail.update(
+                    {
+                        "holding": True,
+                        "basis": "camera_health",
+                        "note": "No reading · lens covered · not distress",
+                    }
+                )
             _append(
                 events,
                 tool="reperceive",
                 cue_kind=cue.kind,
                 rung_id=rung.id,
-                detail={"params": dict(rung.params), "result": "stub_ok"},
+                detail=detail,
             )
+            if store is not None:
+                store.save(incident)
             idx += 1
             continue
 
         if tool == "speaker_prompt":
             text = str(rung.params.get("text", "Are you okay?"))
+            if occlusion:
+                text = str(rung.params.get("occlusion_text") or _OCCLUSION_PROMPT)
             wait_sec = float(rung.params.get("wait_sec", 0))
             consumed_follow_wait = False
             # Prefer following wait rung as listen window when speaker has no wait_sec.
@@ -319,6 +415,8 @@ async def run_incident(
             if max_wait_sec >= 0:
                 listen = min(listen, float(max_wait_sec))
             reply = await speaker.prompt(text, listen)
+            intent = getattr(reply, "intent", None) or classify_response_intent(reply.raw)
+            last_intent = intent
             _append(
                 events,
                 tool="speaker_prompt",
@@ -328,31 +426,37 @@ async def run_incident(
                     "text": text,
                     "reply_kind": reply.kind,
                     "reply_raw": reply.raw,
+                    "response_intent": intent,
                     "wait_sec": listen,
                 },
             )
-            if reply.kind == "ok":
+            if store is not None:
+                store.save(incident)
+            if _refresh_ack(incident, store):
+                _resolve_caregiver_ack(incident, events, cue)
+                break
+            if intent == "clear_ok" or reply.kind == "ok":
                 incident.status = "resolved"
                 _append(
                     events,
                     tool="resolve",
                     cue_kind=cue.kind,
-                    detail={"reason": "speaker_ok"},
+                    detail={"reason": "speaker_ok", "response_intent": intent},
                 )
                 break
-            if reply.kind == "call_caregiver":
-                target = _find_dial_primary_index(plan)
+            if intent == "needs_human" or reply.kind == "call_caregiver":
+                target = _find_human_index(plan)
                 for k in range(idx + 1, target):
                     _log_jump(
                         events,
                         plan.rungs[k],
-                        reason="call_caregiver",
+                        reason="needs_human",
                         from_index=idx,
                         to_index=target,
                     )
                 idx = target
                 continue
-            # silence → continue; skip wait if it was already the listen window
+            # unclear / silence → continue; skip wait if it was already the listen window
             if consumed_follow_wait:
                 skip_next_wait = True
             idx += 1
@@ -371,7 +475,7 @@ async def run_incident(
                 idx += 1
                 continue
             sec = float(rung.params.get("sec", 0))
-            slept = await _bounded_sleep(sec, max_wait_sec)
+            slept = await _sleep_or_ack(incident, store, sec, max_wait_sec)
             _append(
                 events,
                 tool="wait",
@@ -379,6 +483,54 @@ async def run_incident(
                 rung_id=rung.id,
                 detail={"sec": sec, "slept_sec": slept},
             )
+            if _refresh_ack(incident, store) or incident.status == "resolved":
+                _resolve_caregiver_ack(incident, events, cue)
+                break
+            idx += 1
+            continue
+
+        if tool == "notify_caretaker":
+            role = str(rung.params.get("contact") or rung.params.get("role") or "caregiver")
+            contact = _contact_for_role(plan, role)
+            channels = list(rung.params.get("channels") or ["console"])
+            inform_only = occlusion and last_intent != "needs_human"
+            _append(
+                events,
+                tool="notify_caretaker",
+                cue_kind=cue.kind,
+                rung_id=rung.id,
+                detail={
+                    "contact": role,
+                    "contact_id": contact.display_name,
+                    "channels": channels,
+                    "basis": "camera_health_inform" if inform_only else "no_response_escalation",
+                    "distress_claimed": False if inform_only else None,
+                    "note": (
+                        "lens covered · no reading · not claiming distress"
+                        if inform_only
+                        else "awaiting caregiver"
+                    ),
+                },
+            )
+            if store is not None:
+                store.save(incident)
+            await_sec = float(rung.params.get("await_sec", 0) or 0)
+            await _sleep_or_ack(incident, store, await_sec, max_wait_sec)
+            if _refresh_ack(incident, store) or incident.status == "resolved":
+                _resolve_caregiver_ack(incident, events, cue)
+                break
+            if inform_only:
+                incident.status = "resolved"
+                _append(
+                    events,
+                    tool="resolve",
+                    cue_kind=cue.kind,
+                    detail={
+                        "reason": "camera_health_informed",
+                        "distress_claimed": False,
+                    },
+                )
+                break
             idx += 1
             continue
 

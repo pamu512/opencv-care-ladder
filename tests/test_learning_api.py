@@ -18,6 +18,7 @@ def test_learning_endpoints_roundtrip():
         assert data["frozen"] is False
         assert data["effective_no_movement_timeout_sec"] == 360  # 900 * 0.4
         assert data["plan_timeout_sec"] == 900
+        assert "timeout" in (data.get("explain") or "")
 
         # freeze serves plan timeout when no suggestion exists
         client.post(f"/learning/{hh}/freeze")

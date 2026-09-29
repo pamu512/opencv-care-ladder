@@ -136,16 +136,17 @@ Care Ladder is a third path: a camera that **checks in before it escalates**, an
 
 ## What it does
 
-OpenCV 5 perception emits structured cues (`no_movement`, `no_visibility`, `distress_heuristic`). An orchestrator walks a configurable YAML escalation ladder:
+OpenCV 5 perception emits structured cues (`no_movement`, `no_visibility`, `camera_occlusion`, `distress_heuristic`). An orchestrator walks a configurable YAML escalation ladder:
 
-1. Re-perceive (confirm the cue)
-2. Smart-speaker check-in ("Are you okay?")
-3. Wait / listen
-4. Dial primary caregiver (stub)
-5. Dial secondary (stub)
-6. Emergency rung (**fail-closed** by default; even enabled, code audits only and never places a real 911 call)
+1. Re-perceive (confirm the cue; a covered lens holds as camera-health, not distress)
+2. Smart-speaker check-in ("Are you okay?" or "Could you clear the lens?")
+3. Wait / listen (Acknowledge can stand the ladder down mid-flight)
+4. Notify caregiver (console; inform-only on occlusion)
+5. Dial primary caregiver (stub)
+6. Dial secondary (stub)
+7. Emergency rung (**fail-closed** by default; even enabled, code audits only and never places a real 911 call)
 
-**Agentic Vision evidence:** the same `no_movement` cue resolves with no dial when the person answers "I'm fine" (Path A), and escalates through dial stubs on silence (Path B). Vision output changes what the system does next. Every jump is logged with `from_index` / `to_index` / `reason` on the caregiver timeline.
+**Agentic Vision evidence:** the same stillness cue resolves with no dial on a `clear_ok` reply (Path A, including soft OK like "don't worry"), escalates on silence (Path B), and jumps to a human on `needs_human` (mixed hurt never invents OK). A covered camera is a different cue (`camera_occlusion`) and a different tool path: ask to clear the lens, inform the caretaker, never claim distress. Every jump is logged with `from_index` / `to_index` / `reason` on the caregiver timeline.
 
 Privacy is enforced at attach: blur or silhouette runs **before** any pre-event frame is stored or served. Raw identifiable video never leaves the device path.
 

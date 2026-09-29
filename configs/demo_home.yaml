@@ -18,6 +18,8 @@ triggers:
     enabled: true
   distress_heuristic:
     enabled: true
+  camera_occlusion:
+    enabled: true
 rungs:
   - id: reperceive
     tool: reperceive
@@ -26,10 +28,17 @@ rungs:
     tool: speaker_prompt
     params:
       text: "Are you okay? Do you want me to call Alex?"
+      occlusion_text: "The camera looks covered. Could you clear the lens?"
       channel: nest_or_alexa_then_phone
   - id: wait_reply
     tool: wait
     params: { sec: 120 }
+  - id: notify_caretaker
+    tool: notify_caretaker
+    params:
+      contact: caregiver
+      await_sec: 30
+      channels: [console]
   - id: dial_primary
     tool: dial_contact
     params: { contact: caregiver }

@@ -20,6 +20,17 @@ from care_ladder.vision.tracker import PersonTracker
 Point = tuple[float, float]
 
 
+def _frame_unreadable(gray: np.ndarray) -> bool:
+    """Covered or washed-out lens: almost no spatial structure.
+
+    Noisy living-room fixtures keep std well above this (sensor noise + gradient).
+    A blanket / finger over the lens is near-uniform.
+    """
+    if gray.size == 0:
+        return True
+    return float(np.std(gray)) < 2.0
+
+
 class CueDetector:
     """Detect Care Ladder cues from a stream of BGR frames.
 
@@ -45,6 +56,7 @@ class CueDetector:
         enable_no_movement: bool = True,
         enable_no_visibility: bool = True,
         enable_distress_heuristic: bool = True,
+        enable_camera_occlusion: bool = True,
         person_detector: Any | None = None,
         motion_source: str = "frame_diff",
         tracking_enabled: bool = True,
@@ -61,6 +73,9 @@ class CueDetector:
         self.enable_no_movement = enable_no_movement
         self.enable_no_visibility = enable_no_visibility
         self.enable_distress_heuristic = enable_distress_heuristic
+        self.enable_camera_occlusion = enable_camera_occlusion
+        self._occlusion_since: float | None = None
+        self._occlusion_latched = False
         self.person_detector = person_detector
         if motion_source not in ("frame_diff", "mog2"):
             raise ValueError(f"unknown motion_source {motion_source!r}")
@@ -122,6 +137,7 @@ class CueDetector:
             enable_no_movement=bool(plan.triggers.no_movement.enabled),
             enable_no_visibility=bool(plan.triggers.no_visibility.enabled),
             enable_distress_heuristic=bool(plan.triggers.distress_heuristic.enabled),
+            enable_camera_occlusion=bool(plan.triggers.camera_occlusion.enabled),
         )
 
     def observe(self, frame: np.ndarray, t: float) -> CueEvent | None:
@@ -131,6 +147,28 @@ class CueDetector:
             else frame
         )
         h, w = gray.shape[:2]
+
+        # Covered / unreadable lens is camera-health, never distress.
+        if self.enable_camera_occlusion and _frame_unreadable(gray):
+            if self._occlusion_since is None:
+                self._occlusion_since = t
+            elif not self._occlusion_latched and (t - self._occlusion_since) >= 0.2:
+                self._occlusion_latched = True
+                return CueEvent(
+                    kind="camera_occlusion",
+                    confidence=0.9,
+                    detail={
+                        "reason": "lens_covered",
+                        "mean_luma": float(np.mean(gray)),
+                        "std_luma": float(np.std(gray)),
+                        "distress_claimed": False,
+                        "note": "No reading · lens covered",
+                    },
+                )
+            return None
+        self._occlusion_since = None
+        # Recovery: allow another occlusion after the lens is readable again.
+        self._occlusion_latched = False
 
         # Person localization: DNN person detector when available, else contour blob.
         if self.person_detector is not None:

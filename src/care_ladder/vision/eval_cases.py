@@ -128,6 +128,15 @@ def _seq_light_shift() -> list[tuple[np.ndarray, float]]:
     return frames
 
 
+def _seq_covered_lens() -> list[tuple[np.ndarray, float]]:
+    """Uniform near-black frames → camera_occlusion (privacy / camera-health)."""
+    frames = []
+    for i in range(6):
+        f = np.full((240, 320, 3), 3, dtype=np.uint8)
+        frames.append((f, float(i) * 0.3))
+    return frames
+
+
 def _seq_photo_person_still() -> list[tuple[np.ndarray, float]]:
     """Real photo (OpenCV sample with a person) repeated → DNN localizes person;
     identical frames → stillness → no_movement. Requires tests/fixtures/basketball1.png
@@ -181,6 +190,13 @@ def build_cases() -> list[EvalCase]:
             None,
             timeout_sec=8.0,
             frames=_seq_light_shift,
+        ),
+        EvalCase(
+            "covered_lens",
+            "uniform near-black frames, lens covered",
+            "camera_occlusion",
+            timeout_sec=2.0,
+            frames=_seq_covered_lens,
         ),
         EvalCase(
             "photo_person_still",
