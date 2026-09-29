@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 from care_ladder.audit.store import AuditStore
 from care_ladder.channels.bot import BotRegistry, BotState
 from care_ladder.channels.dial import StubDialer
-from care_ladder.channels.telegram_adapter import FakeTelegram, TelegramAdapter
+from care_ladder.channels.telegram_adapter import FakeTelegram, TelegramAdapter, inform_text
 from care_ladder.cloud.sinks import CloudSinks
 from care_ladder.channels.speaker import SpeakerSimulator
 from care_ladder.ladder.orchestrator import run_incident
@@ -634,6 +634,43 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
             if contact and contact.get("phone_e164"):
                 contact["phone_e164"] = _redact(contact["phone_e164"])
         return data
+
+    @application.get("/family/runtime")
+    def family_runtime() -> dict[str, Any]:
+        """Read-only BotThread mirror. Honest about stub vs live Telegram."""
+        adapter: TelegramAdapter = application.state.telegram
+        registry: BotRegistry = application.state.bot_registry
+        token_set = bool(getattr(adapter, "token", None))
+        source = "live" if token_set else "stub"
+        thread = None
+        if registry is not None:
+            thread = registry.open_page() or registry.latest()
+        if thread is not None:
+            incident = application.state.store.get(thread.incident_id)
+            fixture = (incident.cue.detail or {}).get("fixture") if incident else None
+            if not token_set and fixture in {"family_paged_inflight", "path_b_inflight"}:
+                source = "demo_fixture"
+        inform = None
+        sent = getattr(adapter, "sent", None)
+        if sent:
+            last = sent[-1]
+            if isinstance(last, dict):
+                inform = last.get("text")
+        if not inform and thread is not None and thread.inform is not None:
+            inform = inform_text(thread.inform)
+        return {
+            "source": source,
+            "state": thread.state.value if thread is not None else "idle",
+            "incident_id": thread.incident_id if thread is not None else None,
+            "inform_text": inform,
+            "close_reason": thread.close_reason if thread is not None else None,
+            "configured": token_set,
+            "note": (
+                None
+                if token_set
+                else "Telegram is stub-mode. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID for live send."
+            ),
+        }
 
     @application.get("/incidents")
     def list_incidents() -> list[dict[str, Any]]:

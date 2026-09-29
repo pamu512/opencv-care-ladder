@@ -125,3 +125,8 @@ class BotRegistry:
             if thread.state in {BotState.family_paged, BotState.pressure}:
                 return thread
         return None
+
+    def latest(self) -> BotThread | None:
+        if not self._threads:
+            return None
+        return next(reversed(self._threads.values()))

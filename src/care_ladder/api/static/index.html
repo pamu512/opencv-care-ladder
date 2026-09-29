@@ -293,6 +293,14 @@
   .hero{max-width:1120px;margin:16px auto 0;padding:0 20px}
   .hero-line{font-size:18px;font-weight:650;letter-spacing:-.02em;max-width:46ch}
   .hero-sub{margin-top:6px;color:var(--muted);font-size:13.5px;max-width:62ch}
+  .chat-mirror{padding:14px 18px;border-top:1px solid var(--border)}
+  .chat-mirror .mirror-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .chat-mirror .mirror-text{white-space:pre-wrap;font-size:13.5px;color:var(--fg);max-width:72ch;
+    font-family:var(--font-mono);background:var(--inset);border:1px solid var(--border);
+    border-radius:var(--r-s);padding:12px 14px;min-height:4.5em}
+  .chat-mirror .mirror-note{margin-top:8px;font-size:12px;color:var(--faint)}
+  .inc-chat{padding:12px 20px;border-bottom:1px solid var(--border);
+    background:color-mix(in srgb,var(--surface-2) 40%,transparent)}
   details.demo-strip{padding:4px 0}
   details.demo-strip>summary{cursor:pointer;font:600 10.5px/1 var(--font-mono);
     text-transform:uppercase;letter-spacing:.09em;color:var(--faint);padding:10px 18px 4px;
@@ -396,11 +404,12 @@
       <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-ladder"/></svg></div>
       <div>
         <h1>Care Ladder</h1>
-        <div class="sub">Care plan active · demo household</div>
+        <div class="sub">Setup + day archive · demo household</div>
       </div>
     </div>
     <div class="bar-right">
       <span class="chip" id="learning-badge" hidden><span class="dot" aria-hidden="true"></span> <span id="learning-badge-text">Learning schedule</span></span>
+      <span class="chip">Setup + archive</span>
       <span class="chip"><span class="dot" aria-hidden="true"></span> demo · reserved phones · emergency fail-closed</span>
       <button class="iconbtn" id="theme-toggle" type="button" aria-label="Switch color theme" title="Switch theme">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-sun" id="theme-icon"/></svg>
@@ -416,7 +425,7 @@
 
 <div class="consolebar">
   <section class="panel" aria-label="Demo scenarios">
-    <details class="demo-strip" open>
+    <details class="demo-strip">
     <summary>Demo scenarios</summary>
     <div class="triggers">
       <div class="tgroup">
@@ -431,6 +440,9 @@
           <button class="btn" data-fixture="path_b_inflight" type="button">
             <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>
             Path B · ack mid-flight</button>
+          <button class="btn" data-fixture="family_paged_inflight" type="button">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-phone"/></svg>
+            Family page · leave open</button>
           <button class="btn" data-fixture="quiet_hours_suppressed" type="button">
             <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-moon"/></svg>
             Quiet hours · suppressed</button>
@@ -483,6 +495,15 @@
       </div>
     </div>
     </details>
+    <section class="chat-mirror" id="family-chat-mirror" aria-label="Family chat (mirror)">
+      <div class="mirror-head">
+        <span class="sec-title" style="margin:0">Family chat (mirror)</span>
+        <span class="pill p-plain" id="family-mirror-state">idle</span>
+        <span class="pill p-plain" id="family-mirror-source">stub</span>
+      </div>
+      <pre class="mirror-text" id="family-mirror-text">No family page yet. Run Path B silence or Family page to mirror the Telegram inform card.</pre>
+      <p class="mirror-note" id="family-mirror-note">Read-only. Acknowledge on the incident card is a secondary ack source.</p>
+    </section>
   </section>
 </div>
 
@@ -516,6 +537,7 @@
  *   POST /demo/run                      run a fixture
  *   POST /demo/upload + GET /demo/upload/{job}   async clip analysis
  * Optional (see improvement plan): GET /plan → full care-plan rungs.
+ *   GET  /family/runtime                honest BotThread mirror (stub|live|demo_fixture)
  * ------------------------------------------------------------------ */
 
 const TOOL_META = {
@@ -528,6 +550,7 @@ const TOOL_META = {
   emergency:      {icon:"i-siren",  label:"Emergency"},
   notify:         {icon:"i-phone",  label:"Caregiver note"},
   notify_caretaker:{icon:"i-phone", label:"Notify caregiver"},
+  bot:            {icon:"i-phone",  label:"Family chat"},
   resolve:        {icon:"i-check",  label:"Resolve"},
   suppress:       {icon:"i-moon",   label:"Quiet hours"},
   routine_profile_update:{icon:"i-clock", label:"Learning update"},
@@ -582,6 +605,18 @@ async function loadPlan(){
   try{ state.plan = await jfetch("/plan"); }catch{ state.plan = false; }
   return state.plan;
 }
+async function refreshFamilyMirror(){
+  const stateEl=$("#family-mirror-state"), srcEl=$("#family-mirror-source");
+  const textEl=$("#family-mirror-text"), noteEl=$("#family-mirror-note");
+  if (!stateEl || !textEl) return;
+  try{
+    const d = await jfetch("/family/runtime");
+    stateEl.textContent = d.state || "idle";
+    if (srcEl) srcEl.textContent = d.source || "stub";
+    textEl.textContent = d.inform_text || "No family page yet. Run Path B silence or Family page to mirror the Telegram inform card.";
+    if (noteEl) noteEl.textContent = d.note || "Read-only. Acknowledge on the incident card is a secondary ack source.";
+  }catch{ /* keep last paint */ }
+}
 
 /* ---------- "why" verdict ---------- */
 function statusCopy(inc){
@@ -633,7 +668,7 @@ function verdict(inc){
   if (jumps) bits.push(`${jumps} rung${jumps>1?"s":""} skipped (logged with reason)`);
 
   const reason = inc.explain?.resolve_reason || inc.events.find(e=>e.tool==="resolve")?.detail?.reason;
-  if (reason === "caregiver_ack") bits.push("<b>caregiver acknowledged — ladder stood down</b>");
+  if (reason === "caregiver_ack" || reason === "family_ack") bits.push("<b>family or caregiver acknowledged - ladder stood down</b>");
   else if (reason === "camera_health_informed") bits.push("<b>informed on camera health · not distress</b>");
   else if (inc.status === "resolved") bits.push("<b>resolved without emergency escalation</b>");
   else if (inc.status === "exhausted") bits.push("<b>ladder exhausted - emergency stayed fail-closed</b>");
@@ -844,7 +879,18 @@ function detailText(ev){
   if (d.privacy) b.push("privacy: "+esc(d.privacy));
   if (d.sec!=null && d.slept_sec!=null) b.push(`wait ${d.sec}s (slept ${d.slept_sec}s)`);
   if (d.note) b.push(esc(d.note));
+  if (d.state) b.push("bot: "+esc(d.state));
   return b.join(" · ");
+}
+function chatMirrorHTML(inc){
+  const bots = (inc.events||[]).filter(e=>e.tool==="bot");
+  if (!bots.length) return "";
+  const last = bots[bots.length-1];
+  const st = last.detail?.state || "idle";
+  return `<div class="inc-chat" aria-label="Family chat (mirror)">
+    <div class="sec-title">${icon("i-phone")} Family chat (mirror)</div>
+    <p>BotThread state: <b>${esc(st)}</b>${last.detail?.reason?` · ${esc(last.detail.reason)}`:""}</p>
+  </div>`;
 }
 function timelineHTML(inc){
   const firstAt = (inc.events||[]).map(e=>e.at).find(Boolean);
@@ -902,6 +948,7 @@ function renderIncident(inc, frames){
     <div class="verdict">${icon("i-shield")}<p>${verdict(inc)}</p></div>
     ${transcriptHTML(inc)}
     ${explainHTML(inc)}
+    ${chatMirrorHTML(inc)}
     <div class="railwrap">${renderRail(inc)}</div>
     <div class="dossier">${clipHTML(inc,frames)}${telemetry(inc)}</div>
     ${timelineHTML(inc)}
@@ -997,6 +1044,7 @@ async function refresh(force=false){
     $("#fatal").hidden=true;
   }catch(err){ el.innerHTML=""; fatalBox(err); return; }
   await loadPlan();
+  await refreshFamilyMirror();
 
   $("#stats").hidden=false;
   $("#s-total").textContent=list.length;
@@ -1168,6 +1216,7 @@ async function refreshLearningBadge(){
 bindFixtures();
 refresh(true);
 refreshLearningBadge();
+refreshFamilyMirror();
 setInterval(()=>{ if(!document.hidden) refreshLearningBadge(); }, 20000);
 setInterval(()=>{ if(!state.uploading && !document.hidden) refresh(); },20000);
 </script>
