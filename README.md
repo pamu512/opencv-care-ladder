@@ -59,6 +59,17 @@ Demo fixtures: `alexa_path_a` (silence), `alexa_path_a_ok`, `alexa_path_a_soft_o
 (“don’t worry”), `alexa_path_a_needs_human` (mixed hurt), `alexa_path_a_unclear`
 (groan), `alexa_path_b` (occlusion).
 
+### Agentic proof (session key + tool sequence)
+
+Session state is keyed by **household + incident**. One incident id survives:
+
+`start_or_resume_incident` → `check_in_prompt` → `advance_rung` /
+`notify_caretaker` / `resolve_incident` (plus `get_incident_status`,
+`request_call`). Every tool return includes `session_snapshot`
+(`household_id`, `incident_id`, `rung`, `status`, `tools` trail). The sim
+prints `SESSION … rung=… status=…` and resumes the same incident on Path A
+soft-OK and needs-human.
+
 ## Setup
 
 ```bash

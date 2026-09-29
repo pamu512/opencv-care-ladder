@@ -21,12 +21,28 @@ from mcp.client.session import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
 
-async def _call(session: ClientSession, name: str, args: dict, log: list[str]) -> dict:
+def _session_banner(payload: dict, log: list[str], verbose: bool) -> None:
+    snap = payload.get("session_snapshot") or {}
+    hh = snap.get("household_id") or payload.get("household_id") or "amazon-demo-1"
+    iid = snap.get("incident_id") or payload.get("incident_id") or "?"
+    rung = snap.get("rung_index") if snap.get("rung_index") is not None else snap.get("rung") or payload.get("rung") or "?"
+    status = snap.get("status") or payload.get("status") or "?"
+    line = f"SESSION household={hh} incident={iid} rung={rung} status={status}"
+    log.append(line)
+    if verbose:
+        print(line)
+
+
+async def _call(
+    session: ClientSession, name: str, args: dict, log: list[str], verbose: bool = True
+) -> dict:
     result = await session.call_tool(name, args)
     payload = result.structured_content or {}
     line = f"ALEXA+ -> {name}({json.dumps(args)}) => {json.dumps(payload)[:140]}"
     log.append(line)
-    print(line)
+    if verbose:
+        print(line)
+    _session_banner(payload, log, verbose)
     return payload
 
 
@@ -49,11 +65,23 @@ async def run_sim(
             if verbose:
                 print(log[-1])
 
+            hh = "amazon-demo-1"
             started = await _call(
-                session, "start_or_resume_incident", {"cue_kind": cue_kind}, log
+                session,
+                "start_or_resume_incident",
+                {"cue_kind": cue_kind, "household_id": hh},
+                log,
+                verbose,
             )
             iid = started["incident_id"]
-            hh = "amazon-demo-1"
+            # Same-incident resume so the transcript shows one agent memory.
+            await _call(
+                session,
+                "start_or_resume_incident",
+                {"cue_kind": cue_kind, "household_id": hh, "incident_id": iid},
+                log,
+                verbose,
+            )
 
             if answer:
                 chk = await _call(
@@ -61,18 +89,22 @@ async def run_sim(
                     "check_in_prompt",
                     {"household_id": hh, "incident_id": iid, "utterance": answer},
                     log,
+                    verbose,
                 )
                 intent = chk.get("response_intent")
                 log.append(
                     f"ALEXA+ intent {intent} ({chk.get('intent_label')}) "
                     f"raw={chk.get('raw')!r}"
                 )
+                if verbose:
+                    print(log[-1])
                 if intent == "clear_ok":
                     final = await _call(
                         session,
                         "resolve_incident",
                         {"household_id": hh, "incident_id": iid, "reason": "voice_ok"},
                         log,
+                        verbose,
                     )
                     return log, final
                 if intent == "needs_human":
@@ -81,23 +113,30 @@ async def run_sim(
                         "notify_caretaker",
                         {"household_id": hh, "incident_id": iid},
                         log,
+                        verbose,
                     )
                     status = await _call(
                         session,
                         "get_incident_status",
                         {"household_id": hh, "incident_id": iid},
                         log,
+                        verbose,
                     )
                     return log, status
                 # unclear: same as no clear answer — fall through to notify
 
             # silence path: wait window closes -> notify -> offer call
             status = await _call(
-                session, "get_incident_status", {"household_id": hh, "incident_id": iid}, log
+                session, "get_incident_status",
+                {"household_id": hh, "incident_id": iid}, log, verbose,
             )
-            await _call(session, "notify_caretaker", {"household_id": hh, "incident_id": iid}, log)
+            await _call(
+                session, "notify_caretaker",
+                {"household_id": hh, "incident_id": iid}, log, verbose,
+            )
             call = await _call(
-                session, "request_call", {"household_id": hh, "incident_id": iid}, log
+                session, "request_call",
+                {"household_id": hh, "incident_id": iid}, log, verbose,
             )
             log.append(
                 f"Call requested to {call.get('phone_e164')} (simulated={call.get('simulated')})"

@@ -54,6 +54,9 @@ def test_firetv_served_with_calm_care_tech_tokens():
         # shipping copy: resident / primary contact — no personal names
         assert "the resident" in html
         assert "primary contact" in html
+        # Rank 1: same-incident memory, calm (no ops jargon)
+        assert "Same incident · Alexa+ agent remembers" in html
+        assert "via mcp" in html
 
 
 def test_firetv_flow_path_a_then_ack():

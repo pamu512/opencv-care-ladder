@@ -83,9 +83,20 @@ def test_path_a_via_tool_calls_only():
         started = call("start_or_resume_incident", {"cue_kind": "no_movement"})
         iid = started["incident_id"]
         assert started["resumed"] is False
+        _assert_session_snapshot(started, household_id="amazon-demo-1", incident_id=iid)
+
+        resumed = call("start_or_resume_incident", {
+            "cue_kind": "no_movement",
+            "household_id": "amazon-demo-1",
+            "incident_id": iid,
+        })
+        assert resumed["resumed"] is True
+        assert resumed["incident_id"] == iid
+        _assert_session_snapshot(resumed, household_id="amazon-demo-1", incident_id=iid)
 
         st = call("get_incident_status", {"household_id": "amazon-demo-1", "incident_id": iid})
         assert "alexa_checkin" in st["tools"]
+        _assert_session_snapshot(st, household_id="amazon-demo-1", incident_id=iid)
 
         chk = call("check_in_prompt", {
             "household_id": "amazon-demo-1", "incident_id": iid, "utterance": "I'm fine",
@@ -93,6 +104,7 @@ def test_path_a_via_tool_calls_only():
         assert chk["reply_kind"] == "ok"
         assert chk["response_intent"] == "clear_ok"
         assert chk["intent_label"] == "Clear OK"
+        _assert_session_snapshot(chk, household_id="amazon-demo-1", incident_id=iid)
 
         mixed = call("check_in_prompt", {
             "household_id": "amazon-demo-1", "incident_id": iid,
@@ -111,6 +123,8 @@ def test_path_a_via_tool_calls_only():
             "household_id": "amazon-demo-1", "incident_id": iid, "reason": "voice_ok",
         })
         assert res["status"] == "resolved"
+        _assert_session_snapshot(res, household_id="amazon-demo-1", incident_id=iid)
+        assert res["session_snapshot"]["status"] == "resolved"
 
         # double-resolve rejected
         res2 = call("resolve_incident", {
@@ -156,9 +170,39 @@ def test_request_call_is_simulated_with_reserved_number():
             return out
 
         started = call("start_or_resume_incident", {"cue_kind": "no_visibility"})
+        iid = started["incident_id"]
+        _assert_session_snapshot(started, household_id="amazon-demo-1", incident_id=iid)
         out = call("request_call", {
-            "household_id": "amazon-demo-1", "incident_id": started["incident_id"],
+            "household_id": "amazon-demo-1", "incident_id": iid,
         })
         assert out["simulated"] is True
         assert out["phone_e164"] == "+12125550176"
         assert "911" not in out["phone_e164"]
+        _assert_session_snapshot(out, household_id="amazon-demo-1", incident_id=iid)
+
+        notified = call("notify_caretaker", {
+            "household_id": "amazon-demo-1", "incident_id": iid,
+        })
+        assert notified["notified"] is True
+        _assert_session_snapshot(notified, household_id="amazon-demo-1", incident_id=iid)
+        assert "notify_caretaker" in notified["session_snapshot"]["tools"]
+
+        advanced = call("advance_rung", {
+            "household_id": "amazon-demo-1", "incident_id": iid,
+        })
+        _assert_session_snapshot(advanced, household_id="amazon-demo-1", incident_id=iid)
+
+
+def _assert_session_snapshot(payload: dict, *, household_id: str, incident_id: str) -> None:
+    assert payload.get("household_id") == household_id
+    assert payload.get("incident_id") == incident_id
+    snap = payload.get("session_snapshot")
+    assert isinstance(snap, dict), payload
+    assert snap["household_id"] == household_id
+    assert snap["incident_id"] == incident_id
+    assert "rung" in snap
+    assert snap.get("status")
+    assert isinstance(snap.get("tools"), list)
+    assert payload.get("status") == snap["status"]
+    assert payload.get("rung") == snap["rung"]
+    assert payload.get("tools") == snap["tools"]
