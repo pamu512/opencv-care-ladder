@@ -7,6 +7,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol, runtime_checkable
 
+from care_ladder.channels.response_intent import (
+    ResponseIntent,
+    classify_response_intent,
+    intent_to_reply_kind,
+)
 
 SpeakerReplyKind = Literal["ok", "call_caregiver", "silence"]
 
@@ -15,6 +20,7 @@ SpeakerReplyKind = Literal["ok", "call_caregiver", "silence"]
 class SpeakerReply:
     kind: SpeakerReplyKind
     raw: str
+    intent: ResponseIntent = "unclear"
 
 
 @runtime_checkable
@@ -25,22 +31,8 @@ class SpeakerChannel(Protocol):
 
 
 def classify_utterance(raw: str) -> SpeakerReplyKind:
-    """Map a free-form reply to ok / call_caregiver / silence.
-
-    Rules (case-insensitive substring):
-    - contains call / yes call → call_caregiver
-    - contains fine / ok / yes i'm → ok
-    - else → silence
-    """
-    text = raw.casefold().strip()
-    if not text:
-        return "silence"
-    # Prefer call intent when "call" is present (covers "yes call", "call Alex").
-    if "call" in text:
-        return "call_caregiver"
-    if "fine" in text or "ok" in text or "yes i'm" in text or "yes i’m" in text:
-        return "ok"
-    return "silence"
+    """Map a free-form reply to ok / call_caregiver / silence via fail-closed intent."""
+    return intent_to_reply_kind(classify_response_intent(raw))
 
 
 class SpeakerSimulator:
@@ -57,7 +49,11 @@ class SpeakerSimulator:
         _ = text  # spoken prompt; real devices would TTS this
         if self._queue:
             raw = self._queue.pop(0)
-            kind = classify_utterance(raw)
-            return SpeakerReply(kind=kind, raw=raw)
+            intent = classify_response_intent(raw)
+            return SpeakerReply(
+                kind=intent_to_reply_kind(intent),
+                raw=raw,
+                intent=intent,
+            )
         await asyncio.sleep(max(0.0, wait_sec))
-        return SpeakerReply(kind="silence", raw="")
+        return SpeakerReply(kind="silence", raw="", intent="unclear")

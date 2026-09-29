@@ -24,6 +24,7 @@ class Triggers(BaseModel):
     no_movement: NoMovementTrigger
     no_visibility: SimpleTrigger = Field(default_factory=SimpleTrigger)
     distress_heuristic: SimpleTrigger = Field(default_factory=SimpleTrigger)
+    camera_occlusion: SimpleTrigger = Field(default_factory=SimpleTrigger)
 
 
 # Interface alias used in the plan
@@ -69,7 +70,7 @@ class CarePlan(BaseModel):
 
 
 class CueEvent(BaseModel):
-    kind: Literal["no_movement", "no_visibility", "distress_heuristic"]
+    kind: Literal["no_movement", "no_visibility", "distress_heuristic", "camera_occlusion"]
     confidence: float
     detail: dict[str, Any] = Field(default_factory=dict)
 
@@ -81,6 +82,7 @@ class AuditEvent(BaseModel):
     cue_kind: str | None = None
     rung_id: str | None = None
     detail: dict[str, Any] = Field(default_factory=dict)
+    at: datetime | None = None
 
 
 IncidentStatus = Literal["open", "resolved", "exhausted", "suppressed"]

@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="dark light" />
-<title>Care Ladder - Caregiver Console</title>
+<title>Care Ladder · Caregiver console</title>
 <!--
   Care Ladder caregiver console - v2 redesign (hackathon build phase).
   Drop-in replacement for src/care_ladder/api/static/index.html. No backend change
@@ -22,9 +22,9 @@
   :root{
     --font-body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
     --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
-    --bg:#080c14; --surface:#0e1522; --surface-2:#121b2b; --inset:#0a101c;
-    --fg:#e9eff8; --muted:#9aa8bd; --faint:#66748c;
-    --border:rgba(255,255,255,.08); --border-strong:rgba(255,255,255,.16);
+    --bg:#14110e; --surface:#1c1814; --surface-2:#241f1a; --inset:#100e0c;
+    --fg:#f4eee6; --muted:#b6ab9c; --faint:#7f7468;
+    --border:rgba(255,236,210,.08); --border-strong:rgba(255,236,210,.16);
     --accent:#2dd4e8; --accent-deep:#0e7490; --on-accent:#04161c;
     --ok:#34d399; --ok-dim:rgba(52,211,153,.14);
     --warn:#fbbf24; --warn-dim:rgba(251,191,36,.12);
@@ -35,8 +35,8 @@
     --dur:.16s;
   }
   [data-theme="light"]{
-    --bg:#f4f6fa; --surface:#ffffff; --surface-2:#f0f4f9; --inset:#e9eef5;
-    --fg:#101826; --muted:#4c5a70; --faint:#69758a;
+    --bg:#f6f1ea; --surface:#fffdf9; --surface-2:#f3ebe1; --inset:#ebe3d8;
+    --fg:#2a2218; --muted:#5c5348; --faint:#7a7166;
     --border:rgba(16,24,38,.12); --border-strong:rgba(16,24,38,.22);
     --accent:#0e7490; --on-accent:#ffffff;
     --ok:#0f8a5f; --ok-dim:rgba(15,138,95,.10);
@@ -290,6 +290,31 @@
   .c-reperceive,.c-speaker_prompt,.c-wait{color:var(--info)}
   .t-detail{color:var(--muted);font-size:12.5px;overflow-wrap:anywhere}
   .t-detail .q{color:var(--fg)}
+  .hero{max-width:1120px;margin:16px auto 0;padding:0 20px}
+  .hero-line{font-size:18px;font-weight:650;letter-spacing:-.02em;max-width:46ch}
+  .hero-sub{margin-top:6px;color:var(--muted);font-size:13.5px;max-width:62ch}
+  details.demo-strip{padding:4px 0}
+  details.demo-strip>summary{cursor:pointer;font:600 10.5px/1 var(--font-mono);
+    text-transform:uppercase;letter-spacing:.09em;color:var(--faint);padding:10px 18px 4px;
+    list-style:none}
+  details.demo-strip>summary::-webkit-details-marker{display:none}
+  .quote{margin:0;padding:12px 20px;border-bottom:1px solid var(--border);
+    background:color-mix(in srgb,var(--surface-2) 55%,transparent)}
+  .quote p{font-size:14.5px;color:var(--fg)}
+  .quote .who{font:600 10.5px/1 var(--font-mono);text-transform:uppercase;letter-spacing:.08em;
+    color:var(--faint);margin-bottom:6px}
+  .quote .intent{margin-left:8px}
+  .explain{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 20px;
+    border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--surface-2) 35%,transparent)}
+  .explain div span{display:block;font:600 10.5px/1 var(--font-mono);text-transform:uppercase;
+    letter-spacing:.08em;color:var(--faint);margin-bottom:5px}
+  .explain div b{font-weight:650;font-size:13.5px}
+  .t-delta{font:500 11px/1 var(--font-mono);color:var(--faint);min-width:3.5ch}
+  .p-blocked{background:var(--info-dim);color:var(--info)}
+  .p-checking{background:var(--warn-dim);color:var(--warn)}
+  @media (max-width:720px){
+    .explain{grid-template-columns:1fr 1fr}
+  }
 
   footer.site{max-width:1120px;margin:0 auto;padding:26px 20px 40px;color:var(--faint);
     font-size:11.5px;line-height:1.7;border-top:1px solid var(--border)}
@@ -371,7 +396,7 @@
       <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-ladder"/></svg></div>
       <div>
         <h1>Care Ladder</h1>
-        <div class="sub">Caregiver console · demo household</div>
+        <div class="sub">Care plan active · demo household</div>
       </div>
     </div>
     <div class="bar-right">
@@ -384,8 +409,15 @@
   </div>
 </header>
 
+<div class="hero">
+  <p class="hero-line">Vision spots the moment; the ladder picks the next human-safe step.</p>
+  <p class="hero-sub" id="learning-explain">Adaptive stillness timeout follows the household’s usual day — not a clinical score.</p>
+</div>
+
 <div class="consolebar">
-  <section class="panel" aria-label="Demo triggers">
+  <section class="panel" aria-label="Demo scenarios">
+    <details class="demo-strip" open>
+    <summary>Demo scenarios</summary>
     <div class="triggers">
       <div class="tgroup">
         <span>Guided demo</span>
@@ -396,6 +428,9 @@
           <button class="btn primary" data-fixture="no_movement_silence" type="button">
             <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-mic"/></svg>
             Path B · silence escalates</button>
+          <button class="btn" data-fixture="path_b_inflight" type="button">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>
+            Path B · ack mid-flight</button>
           <button class="btn" data-fixture="quiet_hours_suppressed" type="button">
             <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-moon"/></svg>
             Quiet hours · suppressed</button>
@@ -416,6 +451,15 @@
           <button class="btn" data-fixture="no_visibility" type="button">
             <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-eye"/></svg>
             Person left zone</button>
+          <button class="btn" data-fixture="opencv_occlusion" type="button">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-shield"/></svg>
+            Camera blocked · lens covered</button>
+          <button class="btn" data-fixture="speaker_soft_ok" type="button">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-mic"/></svg>
+            Soft OK · don’t worry</button>
+          <button class="btn" data-fixture="speaker_needs_human" type="button">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-phone"/></svg>
+            Needs human · mixed hurt</button>
         </div>
       </div>
       <div class="tgroup">
@@ -438,6 +482,7 @@
         <span class="upload-status" id="cam-status" aria-live="polite"></span>
       </div>
     </div>
+    </details>
   </section>
 </div>
 
@@ -457,7 +502,8 @@
 
 <footer class="site">
   Not a medical device · no real telephony (reserved NANP fiction) · emergency fail-closed ·
-  frames privacy-transformed (blur/silhouette) before persist · person tracking uses shape geometry only, never identity.
+  frames privacy-transformed (blur/silhouette) before persist · person tracking uses shape geometry only, never identity ·
+  a covered camera is camera health, never a distress claim.
 </footer>
 
 <script>
@@ -474,27 +520,35 @@
 
 const TOOL_META = {
   cue:            {icon:"i-cue",    label:"OpenCV cue"},
-  reperceive:     {icon:"i-eye",    label:"Re-perceive"},
+  reperceive:     {icon:"i-eye",    label:"Re-check the room"},
   speaker_prompt: {icon:"i-mic",    label:"Spoken check-in"},
   wait:           {icon:"i-clock",  label:"Listen window"},
-  jump:           {icon:"i-skip",   label:"Jump (logged)"},
+  jump:           {icon:"i-skip",   label:"Skip (logged)"},
   dial_contact:   {icon:"i-phone",  label:"Dial"},
   emergency:      {icon:"i-siren",  label:"Emergency"},
-  notify:         {icon:"i-phone",  label:"Notify"},
+  notify:         {icon:"i-phone",  label:"Caregiver note"},
+  notify_caretaker:{icon:"i-phone", label:"Notify caregiver"},
   resolve:        {icon:"i-check",  label:"Resolve"},
   suppress:       {icon:"i-moon",   label:"Quiet hours"},
+  routine_profile_update:{icon:"i-clock", label:"Learning update"},
 };
 const CUE_LABEL = {
   no_movement: "Stillness in zone",
   no_visibility: "Person left zone",
   distress_heuristic: "Fall signature (sudden vertical-to-horizontal)",
+  camera_occlusion: "No reading · lens covered",
+};
+const INTENT_LABEL = {
+  clear_ok: "clear OK",
+  needs_human: "needs a person",
+  unclear: "unclear",
 };
 const RENDER_LIMIT = 12;
 
 const $ = (s)=>document.querySelector(s);
 const state = { plan:null, seen:new Set(), uploading:false, expanded:new Set(), limit:RENDER_LIMIT };
 // default the timeline open on the newest incident and on distress/exhausted ones
-function defaultOpen(inc){ return inc.cue.kind==="distress_heuristic" || inc.status==="exhausted"; }
+function defaultOpen(inc){ return inc.cue.kind==="distress_heuristic" || inc.cue.kind==="camera_occlusion" || inc.status==="exhausted" || inc.status==="open"; }
 
 function esc(s){const d=document.createElement("div");d.textContent=s??"";return d.innerHTML.replace(/"/g,"&quot;");}
 function icon(id,cls){return `<svg class="${cls||"ic"}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#${id}"/></svg>`;}
@@ -530,23 +584,44 @@ async function loadPlan(){
 }
 
 /* ---------- "why" verdict ---------- */
+function statusCopy(inc){
+  if (inc.cue.kind === "camera_occlusion" && inc.status !== "resolved")
+    return {label:"Camera blocked", cls:"p-blocked"};
+  if (inc.status === "resolved") return {label:"Resolved", cls:"p-resolved"};
+  if (inc.status === "suppressed") return {label:"Quiet hours", cls:"p-open"};
+  if (inc.status === "exhausted") return {label:"Ladder stood down", cls:"p-exhausted"};
+  const tools = (inc.events||[]).map(e=>e.tool);
+  if (tools.includes("notify_caretaker")) return {label:"Care plan active", cls:"p-checking"};
+  if (tools.includes("speaker_prompt")) return {label:"Checking on Pat", cls:"p-checking"};
+  if (tools.includes("reperceive")) return {label:"Re-checking", cls:"p-checking"};
+  return {label:"Care plan active", cls:"p-open"};
+}
 function verdict(inc){
   const bits = [];
   if (inc.status === "suppressed"){
     const d = inc.events.find(e=>e.tool==="suppress")?.detail || {};
     return `Quiet-hours policy (<b>${esc(d.quiet_hours_start||"22:00")}-${esc(d.quiet_hours_end||"07:00")}</b>) suppressed this non-distress cue. Suppression is recorded, not dropped; distress cues always run.`;
   }
-  if (inc.cue.kind === "distress_heuristic")
+  if (inc.cue.kind === "camera_occlusion")
+    bits.push("<b>No reading · lens covered</b> — camera health, not distress");
+  else if (inc.cue.kind === "distress_heuristic")
     bits.push("Fall signature detected");
   else
     bits.push(CUE_LABEL[inc.cue.kind] || inc.cue.kind);
 
   const sp = inc.events.find(e=>e.tool==="speaker_prompt");
   if (sp){
+    const intent = sp.detail?.response_intent;
     const k = sp.detail?.reply_kind;
-    if (k === "ok") bits.push(`verbal “${esc(sp.detail.reply_raw||"I’m fine")}” at check-in`);
-    else if (k === "call_caregiver") bits.push("asked to call the caregiver");
-    else bits.push("no reply in the listen window");
+    if (intent === "clear_ok" || k === "ok") bits.push(`check-in intent <b>clear_ok</b> (“${esc(sp.detail.reply_raw||"I’m fine")}”)`);
+    else if (intent === "needs_human" || k === "call_caregiver") bits.push(`check-in intent <b>needs_human</b>`);
+    else bits.push("check-in intent <b>unclear</b> — no reply we can trust");
+  }
+  const nt = inc.events.find(e=>e.tool==="notify_caretaker");
+  if (nt){
+    bits.push(nt.detail?.basis === "camera_health_inform"
+      ? "caretaker informed (no distress claimed)"
+      : "caretaker notified");
   }
   for (const d of inc.events.filter(e=>e.tool==="dial_contact")){
     const who = d.detail?.contact || "contact";
@@ -557,10 +632,36 @@ function verdict(inc){
   const jumps = inc.events.filter(e=>e.tool==="jump").length;
   if (jumps) bits.push(`${jumps} rung${jumps>1?"s":""} skipped (logged with reason)`);
 
-  if (inc.status === "resolved") bits.push("<b>resolved without emergency escalation</b>");
+  const reason = inc.explain?.resolve_reason || inc.events.find(e=>e.tool==="resolve")?.detail?.reason;
+  if (reason === "caregiver_ack") bits.push("<b>caregiver acknowledged — ladder stood down</b>");
+  else if (reason === "camera_health_informed") bits.push("<b>informed on camera health · not distress</b>");
+  else if (inc.status === "resolved") bits.push("<b>resolved without emergency escalation</b>");
   else if (inc.status === "exhausted") bits.push("<b>ladder exhausted - emergency stayed fail-closed</b>");
   else bits.push(`<b>${esc(inc.status)}</b>`);
   return bits.join(" → ");
+}
+function transcriptHTML(inc){
+  const sp = inc.events.find(e=>e.tool==="speaker_prompt");
+  if (!sp) return "";
+  const intent = sp.detail?.response_intent;
+  const raw = sp.detail?.reply_raw;
+  const quote = raw ? `“${esc(raw)}”` : "no spoken reply";
+  return `<div class="quote"><div class="who">Check-in
+    ${intent?`<span class="pill p-plain intent">${esc(INTENT_LABEL[intent]||intent)}</span>`:""}</div>
+    <p>${esc(sp.detail?.text||"Are you okay?")} — <span class="q">${quote}</span></p></div>`;
+}
+function explainHTML(inc){
+  const x = inc.explain || {};
+  const duration = x.duration_sec!=null ? `${Number(x.duration_sec).toFixed(1)}s` : "—";
+  const who = x.acked_by || inc.acked_by || "not yet";
+  const vision = x.vision || CUE_LABEL[inc.cue.kind] || inc.cue.kind;
+  const did = (x.actions||[]).map(a=>a.label).filter(Boolean).slice(0,5).join(" · ") || "—";
+  return `<div class="explain" aria-label="Incident explain">
+    <div><span>What vision knew</span><b>${esc(vision)}</b></div>
+    <div><span>What we did</span><b>${esc(did)}</b></div>
+    <div><span>How long</span><b>${esc(duration)}</b></div>
+    <div><span>Who acked</span><b>${esc(who)}</b></div>
+  </div>`;
 }
 
 /* ---------- ladder rail ---------- */
@@ -637,6 +738,7 @@ function jumpReason(d){
     listen_window_already_consumed:"listen window already used",
     no_answer_escalation:"no answer → escalate",
     call_caregiver:"person asked to call",
+    needs_human:"needs a person",
     no_answer_fail_closed_or_exhausted:"ladder exhausted",
     emergency_disabled_fail_closed:"fail-closed (disabled)",
   };
@@ -652,6 +754,7 @@ function renderRail(inc){
   if (!nodes.length && inc.status !== "suppressed")
     return `<div class="rail-empty">No audit events recorded for this incident.</div>`;
   const cueSub = inc.cue.kind === "distress_heuristic" ? "distress · escalates fast"
+    : inc.cue.kind === "camera_occlusion" ? "No reading · lens covered"
     : (inc.cue.detail?.source || "cue detector");
   const outLabel = {resolved:["i-check","Resolved"], exhausted:["i-alert","Exhausted"],
     open:["i-clock","Open"], suppressed:["i-moon","Suppressed"]}[inc.status] || ["i-code",inc.status];
@@ -729,7 +832,9 @@ function clipHTML(inc, frames){
 function detailText(ev){
   const d = ev.detail||{}; const b=[];
   if (d.text) b.push(`“<span class="q">${esc(d.text)}</span>”`);
+  if (d.response_intent) b.push("intent: "+esc(d.response_intent));
   if (d.reply_kind) b.push("reply: "+esc(d.reply_kind)+(d.reply_raw?` (“${esc(d.reply_raw)}”)`:""));
+  if (d.basis) b.push("basis: "+esc(d.basis));
   if (d.status) b.push("status: "+esc(d.status));
   if (d.result) b.push("result: "+esc(d.result));
   if (d.contact) b.push("contact: "+esc(d.contact)+(d.phone_e164?` · ${esc(d.phone_e164)}`:""));
@@ -742,17 +847,23 @@ function detailText(ev){
   return b.join(" · ");
 }
 function timelineHTML(inc){
-  const rows = inc.events.map((ev,ix)=>`
-    <li>
+  const firstAt = (inc.events||[]).map(e=>e.at).find(Boolean);
+  const start = firstAt ? Date.parse(firstAt) : (inc.created_at ? Date.parse(inc.created_at) : null);
+  const rows = inc.events.map((ev,ix)=>{
+    const t = ev.at ? Date.parse(ev.at) : NaN;
+    const delta = start && !Number.isNaN(t) ? `+${((t-start)/1000).toFixed(1)}s` : "";
+    return `<li>
       <div class="t-what"><span class="t-ix">#${ix+1}</span>
-        <span class="t-tool c-${esc(ev.tool)}">${esc(TOOL_META[ev.tool]?.label||ev.tool)}</span>
+        <span class="t-delta">${delta}</span>
+        <span class="t-tool c-${esc(ev.tool)}">${esc(TOOL_META[ev.tool]?.label||ev.tool.replaceAll("_"," "))}</span>
         <span class="t-rung">${esc(ev.rung_id||"")}</span></div>
       <div class="t-detail">${detailText(ev)||"&nbsp;"}</div>
-    </li>`).join("");
+    </li>`;
+  }).join("");
   const open = state.expanded.has(inc.id);
   return `<div class="tl-wrap">
     <button class="tl-head" type="button" aria-expanded="${open}" data-toggle="${esc(inc.id)}">
-      <span class="sec-title">${icon("i-code")} Audit timeline</span>
+      <span class="sec-title">${icon("i-code")} Audit trail</span>
       <span class="count">${inc.events.length} events</span>
       <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
     </button>
@@ -763,25 +874,34 @@ function timelineHTML(inc){
 /* ---------- incident card ---------- */
 function renderIncident(inc, frames){
   const distress = inc.cue.kind === "distress_heuristic";
+  const blocked = inc.cue.kind === "camera_occlusion";
+  const st = statusCopy(inc);
   const cuePill = distress
     ? `<span class="pill p-distress">${icon("i-alert")}fall signature</span>`
+    : blocked
+    ? `<span class="pill p-blocked">${icon("i-shield")}No reading · lens covered</span>`
     : `<span class="pill p-cue">${icon("i-cue")}cue: ${esc(inc.cue.kind)}</span>`;
+  const age = inc.created_at ? Math.max(0, Math.round((Date.now()-Date.parse(inc.created_at))/60000)) : null;
   return `<article class="incident ${distress?"distress":""}" id="inc-${esc(inc.id)}" data-id="${esc(inc.id)}">
     <div class="inc-head">
       <span class="inc-id">${esc(inc.id.slice(0,10))}</span>
-      <span class="pill p-${esc(inc.status)}">${icon(inc.status==="resolved"?"i-check":inc.status==="suppressed"?"i-moon":"i-clock")}${esc(inc.status)}</span>
+      <span class="pill ${st.cls}">${icon(inc.status==="resolved"?"i-check":inc.status==="suppressed"?"i-moon":"i-clock")}${esc(st.label)}</span>
       ${cuePill}
+      ${age!=null && age < 180?`<span class="pill p-plain">aging ${age}m</span>`:""}
       <span class="inc-meta">
         <span>household ${esc(inc.household_id)}</span>
         <a class="trace-link" href="/incidents/${esc(inc.id)}" target="_blank" rel="noopener">${icon("i-code")}raw trace</a>
         ${inc.acked_by
           ? `<span class="pill p-resolved" title="Acknowledged by ${esc(inc.acked_by)}">${icon("i-check")}acked</span>`
-          : `<button class="btn" type="button" data-ack="${esc(inc.id)}" title="Confirm you have seen this incident">${icon("i-check")}Acknowledge</button>`}
+          : `<button class="btn" type="button" data-ack="${esc(inc.id)}" title="One tap stops an active escalation">${icon("i-check")}Acknowledge</button>`}
         <button class="iconbtn" type="button" data-focus aria-label="Focus this incident" title="Focus">${icon("i-expand")}</button>
       </span>
     </div>
     ${distress?`<div class="fall-banner">${icon("i-alert")}Fall signature detected: sudden vertical-to-horizontal transition; the ladder escalates past the verbal rung.</div>`:""}
+    ${blocked?`<div class="fall-banner" style="color:var(--info);background:var(--info-dim)">${icon("i-shield")}Camera blocked — privacy / camera-health path. No distress is being claimed.</div>`:""}
     <div class="verdict">${icon("i-shield")}<p>${verdict(inc)}</p></div>
+    ${transcriptHTML(inc)}
+    ${explainHTML(inc)}
     <div class="railwrap">${renderRail(inc)}</div>
     <div class="dossier">${clipHTML(inc,frames)}${telemetry(inc)}</div>
     ${timelineHTML(inc)}
@@ -1038,6 +1158,10 @@ async function refreshLearningBadge(){
     else if(d.learning_phase === "settled"){ text.textContent = "Schedule settled"; badge.dataset.phase = "settled"; }
     else { text.textContent = "Learning schedule"; badge.dataset.phase = "rapid"; }
     badge.title = `stillness timeout ${Math.round(d.effective_no_movement_timeout_sec/60)}m (plan ${Math.round(d.plan_timeout_sec/60)}m) · ${d.confirmed_ok_days}/${d.settled_after_days} OK days`;
+    const explain = $("#learning-explain");
+    if (explain && d.explain){
+      explain.textContent = d.explain + " — not a clinical score, and it never moves the emergency gate.";
+    }
   }catch{ /* endpoint absent: badge stays hidden */ }
 }
 

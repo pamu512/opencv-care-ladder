@@ -31,23 +31,32 @@ never touches rung order or the fail-closed emergency gate. See
 1. **Vision (`CueDetector`)** watches frames in a plan zone and may emit a structured `CueEvent`:
    - `no_movement` - person-like blob still past `triggers.no_movement.timeout_sec`
    - `no_visibility` - monitored person leaves / cannot be seen in zone
+   - `camera_occlusion` - lens covered / unreadable (privacy + camera-health, **not** distress)
    - `distress_heuristic` - simple motion/pose heuristic (not a medical assessment)
 2. **Orchestrator (`run_incident`)** starts an incident from that cue and walks `configs/demo_home.yaml` **rungs** in order, appending an audit event per step:
-   - `reperceive` → confirm / stub re-check
-   - `speaker_prompt` → Nest/Alexa-style “Are you okay?” (simulator)
-   - `wait` → listen / settle window (bounded in demo)
+   - `reperceive` → confirm / stub re-check (occlusion holds as camera-health)
+   - `speaker_prompt` → smart-speaker simulator “Are you okay?” (or “clear the lens?” on occlusion)
+   - `wait` → listen / settle window (bounded in demo; interruptible by Acknowledge)
+   - `notify_caretaker` → in-console notify + optional await; one-tap Acknowledge stands the ladder down
    - `dial_contact` → stub dial caregiver / secondary
    - `emergency` → **fail-closed** unless `params.enabled: true` (demo YAML keeps it `false`; even if enabled, code audits only and **never** places a real 911 call)
 3. **Branching from cue + replies** (what judges see in the timeline):
-   - Speaker **`ok`** → resolve (no dial)
-   - Speaker **`call_caregiver`** → jump to primary dial (skipped rungs logged)
-   - Speaker **`silence`** → continue down the ladder (demo fixture path)
+   - Speaker intent **`clear_ok`** (soft OK like “don’t worry”, or “I’m fine”) → resolve (no dial)
+   - Speaker intent **`needs_human`** (help / mixed hurt — never invents OK) → jump to notify / dial
+   - Speaker intent **`unclear`** (silence, groan) → continue down the ladder
+   - Occlusion + silence → notify on **camera-health** basis, inform caretaker, **no distress claim**, no dial
+   - Mid-ladder **Acknowledge** → resolve reason `caregiver_ack`, remaining rungs skipped
    - Dial **`answered`** → resolve
    - Dial **`no_answer`** → escalate to next dial / skip non-dial rungs (logged jumps)
 
+The spoken-reply classifier is **deterministic** (`src/care_ladder/channels/response_intent.py`). An optional LLM path stays **off** unless `CARE_LADDER_INTENT_LLM` is set (and even then the demo uses the rules above).
+
 Demo fixtures:
 - `no_movement_ok` - injects a `no_movement` cue with a verbal **"I'm fine"** speaker reply (spec §10 Path A): incident resolves at the check-in rung, no dial, no emergency.
-- `no_movement_silence` - injects a `no_movement` cue with an empty speaker script (silence) so the ladder escalates through dial stubs.
+- `no_movement_silence` - injects a `no_movement` cue with an empty speaker script (silence) so the ladder escalates through notify + dial stubs.
+- `path_b_inflight` - same cue, left **open** on notify so Acknowledge can stand the ladder down mid-flight (`caregiver_ack`).
+- `speaker_soft_ok` / `speaker_needs_human` - same stillness cue, different intent (`clear_ok` vs `needs_human`) and therefore different next tools.
+- `opencv_occlusion` - **covered-lens frames** through `CueDetector` → `camera_occlusion` → ask to clear the lens → inform caretaker (no distress, no dial). UI label: **No reading · lens covered**.
 - `opencv_stillness` - feeds **synthetic numpy frames** through `CueDetector.observe` (OpenCV), then `run_incident`; audit cue is tagged `source: opencv_cue_detector`.
 - `opencv_dnn_person` - feeds a **real photo** through the **MediaPipe person-detection ONNX via OpenCV 5 DNN** (`models/`, run `scripts/download_models.sh` once), then the ladder; audit cue is tagged `source: opencv_dnn_person_detector` with detector name. Frames attach as silhouettes.
 
@@ -102,11 +111,16 @@ Returns `{"incident_id":"<id>"}`.
 
 ### 2b. Or use the caregiver console UI
 
-Open **http://127.0.0.1:8000/ui/** - SafelyYou-style incident timeline with one-click
-demo fixtures:
+Open **http://127.0.0.1:8000/ui/** - caregiver console with a collapsible **Demo scenarios**
+strip (open by default). Status language is Calm Care-Tech (Care plan active /
+Checking on Pat / Camera blocked / Resolved). Each incident answers what vision
+knew, what we did, how long, and who acked — plus the adaptive **Learning schedule**
+badge and explain line.
 
 - **Path A: verbal OK** (`no_movement_ok`) - check-in clears, no dial.
-- **Path B: silence → escalate** (`no_movement_silence`) - dials walk stubs, jumps logged.
+- **Path B: silence → escalate** (`no_movement_silence`) - notify then dial stubs, jumps logged.
+- **Path B: ack mid-flight** (`path_b_inflight`) - Acknowledge stands the ladder down.
+- **Camera blocked** (`opencv_occlusion`) - covered lens is camera-health, not distress.
 - **OpenCV stillness** (`opencv_stillness`) - synthetic frames through `CueDetector`.
 
 Why this design (cited research): [`docs/research-brief.md`](docs/research-brief.md).

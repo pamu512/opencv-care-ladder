@@ -29,6 +29,9 @@ Word-for-word VO in the right column - read it verbatim or paraphrase lightly; i
 ## Console v2 additions (record these beats)
 
 - After Path B resolves, click **Acknowledge** on the incident card: the button flips to an "acked" pill and a `caregiver_ack` event lands in the timeline. VO: "The loop closes with a human: the caregiver acknowledges, and that acknowledgement is part of the audit trail - not a silent read receipt."
+- **Path B · ack mid-flight:** start that fixture, then Acknowledge while status is still open. The ladder stands down with resolve reason `caregiver_ack` — no further dial.
+- **Camera blocked:** run `opencv_occlusion`. Hero reads **No reading · lens covered**. Check-in asks to clear the lens. Notify is camera-health; no distress is claimed.
+- Point at the four-up explain rail (what vision knew / what we did / how long / who acked) and the **Learning schedule** badge + explain line under the hero.
 - In the DNN/privacy beat, point at the **detection frame** (telemetry panel): the annotated box + numbers ARE the "why this cue fired" answer, privacy-transformed.
 - The ladder rail now shows never-reached rungs (via GET /plan) - end on "Emergency, fail-closed, never reached" for the responsibility beat.
 

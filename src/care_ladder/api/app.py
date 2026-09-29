@@ -47,8 +47,34 @@ SUPPORTED_FIXTURES = frozenset(
         "opencv_stillness",
         "opencv_dnn_person",
         "opencv_pose_person",
+        "opencv_occlusion",
+        "speaker_soft_ok",
+        "speaker_needs_human",
+        "path_b_inflight",
     }
 )
+
+_TOOL_LABELS = {
+    "cue": "OpenCV cue",
+    "reperceive": "Re-check the room",
+    "speaker_prompt": "Spoken check-in",
+    "wait": "Listen window",
+    "notify_caretaker": "Notify caregiver",
+    "notify": "Caregiver note",
+    "dial_contact": "Dial",
+    "emergency": "Emergency (fail-closed)",
+    "resolve": "Resolve",
+    "jump": "Skip (logged)",
+    "suppress": "Quiet hours",
+    "routine_profile_update": "Learning update",
+}
+
+_VISION_LABELS = {
+    "no_movement": "Stillness in zone",
+    "no_visibility": "Person left zone",
+    "distress_heuristic": "Fall signature (non-clinical)",
+    "camera_occlusion": "No reading · lens covered",
+}
 _POSE_MODEL_PATH = _REPO_ROOT / "models" / "pose_estimation_mediapipe_2023mar.onnx"
 _MODEL_PATH = _REPO_ROOT / "models" / "person_detection_mediapipe_2023mar.onnx"
 # Midday UTC so quiet_hours soft-suppress does not hide the judge demo ladder.
@@ -73,6 +99,54 @@ def _incident_summary(incident) -> dict[str, Any]:
         "status": incident.status,
         "cue": incident.cue.model_dump(),
         "event_count": len(incident.events),
+        "acked_by": incident.acked_by,
+    }
+
+
+def incident_explain(incident) -> dict[str, Any]:
+    """Management-grade explain surface: what vision knew, what we did, how long, who acked."""
+    events = incident.events
+    speaker = next((e for e in events if e.tool == "speaker_prompt"), None)
+    resolve = next((e for e in events if e.tool == "resolve"), None)
+    notify = next((e for e in events if e.tool == "notify_caretaker"), None)
+    stamped = [e.at for e in events if e.at is not None]
+    # Prefer the audit stamps, not incident.created_at: demo fixtures pin
+    # created_at to DEMO_NOW while events are stamped at request time.
+    start = stamped[0] if stamped else incident.created_at
+    end = stamped[-1] if stamped else None
+    duration = None
+    if start is not None and end is not None:
+        duration = max(0.0, (end - start).total_seconds())
+    actions = []
+    prev = start
+    for e in events:
+        if e.tool in {"cue", "routine_profile_update"}:
+            prev = e.at or prev
+            continue
+        delta = None
+        if e.at is not None and prev is not None:
+            delta = max(0.0, (e.at - prev).total_seconds())
+        actions.append(
+            {
+                "tool": e.tool,
+                "label": _TOOL_LABELS.get(e.tool, e.tool.replace("_", " ")),
+                "delta_sec": delta,
+                "rung_id": e.rung_id,
+            }
+        )
+        prev = e.at or prev
+    return {
+        "vision": _VISION_LABELS.get(incident.cue.kind, incident.cue.kind),
+        "vision_note": (incident.cue.detail or {}).get("note"),
+        "intent": (speaker.detail or {}).get("response_intent") if speaker else None,
+        "reply_quote": (speaker.detail or {}).get("reply_raw") if speaker else None,
+        "checkin_prompt": (speaker.detail or {}).get("text") if speaker else None,
+        "actions": actions,
+        "duration_sec": duration,
+        "acked_by": incident.acked_by,
+        "resolve_reason": (resolve.detail or {}).get("reason") if resolve else None,
+        "notify_basis": (notify.detail or {}).get("basis") if notify else None,
+        "distress_claimed": False if incident.cue.kind == "camera_occlusion" else None,
     }
 
 
@@ -134,6 +208,97 @@ async def _run_no_movement_ok(store: AuditStore):
     )
     _save_profile(profile)  # persist learning update (spec section 5)
     return incident
+
+
+async def _run_speaker_soft_ok(store: AuditStore):
+    """Stillness + soft OK ('don't worry') → clear_ok, no dial."""
+    plan = load_care_plan(_DEMO_PLAN_PATH)
+    cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "speaker_soft_ok"})
+    speaker = SpeakerSimulator(scripted=["don't worry"])
+    dialer = StubDialer(behavior={})
+    profile = _demo_profile()
+    incident = await run_incident(
+        cue=cue, plan=plan, speaker=speaker, dialer=dialer,
+        pre_event_frames=[], routine_profile=profile, store=store, now=DEMO_NOW,
+    )
+    _save_profile(profile)
+    return incident
+
+
+async def _run_speaker_needs_human(store: AuditStore):
+    """Stillness + mixed hurt never invents OK → needs_human → notify/dial."""
+    plan = load_care_plan(_DEMO_PLAN_PATH)
+    cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "speaker_needs_human"})
+    speaker = SpeakerSimulator(scripted=["I'm ok but I hurt my hip"])
+    dialer = StubDialer(behavior={"caregiver": "answered"})
+    profile = _demo_profile()
+    incident = await run_incident(
+        cue=cue, plan=plan, speaker=speaker, dialer=dialer,
+        pre_event_frames=[], routine_profile=profile, store=store, now=DEMO_NOW,
+    )
+    _save_profile(profile)
+    return incident
+
+
+def _synthetic_occlusion_frames(
+    *,
+    width: int = 640,
+    height: int = 480,
+) -> list[np.ndarray]:
+    """Uniform near-black frames: covered / unreadable lens."""
+    return [np.full((height, width, 3), 4, dtype=np.uint8) for _ in range(4)]
+
+
+async def _run_opencv_occlusion(store: AuditStore):
+    """Fixture: covered-lens frames → CueDetector camera_occlusion → inform-only Path B."""
+    plan = load_care_plan(_DEMO_PLAN_PATH)
+    detector = CueDetector.from_plan(plan, zone_id="living_room")
+    frames = _synthetic_occlusion_frames()
+    cue: CueEvent | None = None
+    for frame, t in zip(frames, [0.0, 0.4, 0.8, 1.2], strict=True):
+        cue = detector.observe(frame, t=t)
+        if cue is not None:
+            break
+    if cue is None:
+        raise RuntimeError("opencv_occlusion fixture: CueDetector did not emit camera_occlusion")
+    cue.detail = {
+        **cue.detail,
+        "source": "opencv_cue_detector",
+        "fixture": "opencv_occlusion",
+        "distress_claimed": False,
+        "note": "No reading · lens covered",
+    }
+    speaker = SpeakerSimulator(scripted=[])
+    dialer = StubDialer(behavior={"caregiver": "answered"})
+    return await run_incident(
+        cue=cue,
+        plan=plan,
+        speaker=speaker,
+        dialer=dialer,
+        pre_event_frames=frames[-2:],
+        store=store,
+        privacy_mode="silhouette",
+        now=DEMO_NOW,
+    )
+
+
+async def _run_path_b_inflight(store: AuditStore, *, max_wait_sec: float = 25.0):
+    """Path B left open on the notify rung so a caregiver can ack mid-ladder."""
+    plan = load_care_plan(_DEMO_PLAN_PATH)
+    cue = CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "path_b_inflight"})
+    # Immediate silence (empty utterance) so the interruptible window is notify+await.
+    speaker = SpeakerSimulator(scripted=[""])
+    dialer = StubDialer(behavior={"caregiver": "no_answer", "secondary": "answered"})
+    return await run_incident(
+        cue=cue,
+        plan=plan,
+        speaker=speaker,
+        dialer=dialer,
+        pre_event_frames=[],
+        store=store,
+        now=DEMO_NOW,
+        max_wait_sec=max_wait_sec,
+    )
 
 
 async def _run_no_movement_silence(store: AuditStore):
@@ -373,9 +538,13 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
         """RoutineProfile for the UI badge: phase, days, explain, controls state."""
         profile = _LEARNING_STORE.get_or_create(household_id)
         plan = load_care_plan(_DEMO_PLAN_PATH)
-        from care_ladder.learning.profile import effective_no_movement_timeout_sec
+        from care_ladder.learning.profile import (
+            effective_no_movement_timeout_sec,
+            explain as _learning_explain,
+        )
 
         eff = effective_no_movement_timeout_sec(plan, profile)
+
         return {
             "household_id": household_id,
             "learning_phase": profile.learning_phase,
@@ -385,6 +554,11 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
             "effective_no_movement_timeout_sec": eff,
             "plan_timeout_sec": plan.triggers.no_movement.timeout_sec,
             "usual_still_end_hour": profile.usual_still_end_hour,
+            "explain": _learning_explain(
+                profile,
+                plan_timeout_sec=plan.triggers.no_movement.timeout_sec,
+                effective_sec=eff,
+            ),
         }
 
     @application.post("/learning/{household_id}/freeze")
@@ -433,17 +607,19 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
         incident = application.state.store.get(incident_id)
         if incident is None:
             raise HTTPException(status_code=404, detail="incident not found")
-        # Full timeline JSON: ordered audit events (cue → tools → resolve/jump).
-        return incident.model_dump()
+        # Full timeline JSON plus a management-grade explain surface.
+        payload = incident.model_dump()
+        payload["explain"] = incident_explain(incident)
+        return payload
 
     @application.post("/incidents/{incident_id}/ack")
     def ack_incident(incident_id: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
         """Caregiver acknowledgement: a human confirmed they saw this incident.
 
-        Appends a ``caregiver_ack`` audit event and stamps ``acked_by``/
-        ``acked_at``. Status is unchanged (resolved stays resolved) - the ack
-        is the human-side close of the loop; the orchestrator consults it for
-        re-dial cooldown on subsequent cues.
+        Stamps ``acked_by`` / ``acked_at`` and appends a ``caregiver_ack``
+        audit event. If the ladder is still open (mid-flight notify/wait),
+        ack resolves the incident with reason ``caregiver_ack`` so escalation
+        stands down. Already-closed incidents keep their status.
         """
         incident = application.state.store.get(incident_id)
         if incident is None:
@@ -461,10 +637,26 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
                 tool="notify",
                 cue_kind=incident.cue.kind,
                 detail={"action": "caregiver_ack", "contact": contact, "note": note},
+                at=now,
             )
         )
+        if incident.status == "open":
+            incident.status = "resolved"
+            incident.events.append(
+                AuditEvent(
+                    tool="resolve",
+                    cue_kind=incident.cue.kind,
+                    detail={"reason": "caregiver_ack", "contact": contact, "note": note},
+                    at=now,
+                )
+            )
         application.state.store.save(incident)
-        return {"incident_id": incident.id, "acked_by": contact, "acked_at": now.isoformat()}
+        return {
+            "incident_id": incident.id,
+            "acked_by": contact,
+            "acked_at": now.isoformat(),
+            "status": incident.status,
+        }
 
     @application.get("/incidents/{incident_id}/frames/{index}", response_class=Response)
     def get_incident_frame(incident_id: str, index: int):
@@ -721,6 +913,36 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
             incident = await _run_opencv_dnn_person(application.state.store)
         elif body.fixture == "opencv_pose_person":
             incident = await _run_opencv_pose_person(application.state.store)
+        elif body.fixture == "opencv_occlusion":
+            incident = await _run_opencv_occlusion(application.state.store)
+        elif body.fixture == "speaker_soft_ok":
+            incident = await _run_speaker_soft_ok(application.state.store)
+        elif body.fixture == "speaker_needs_human":
+            incident = await _run_speaker_needs_human(application.state.store)
+        elif body.fixture == "path_b_inflight":
+            task = asyncio.create_task(
+                _run_path_b_inflight(application.state.store)
+            )
+            tasks = getattr(application.state, "inflight_tasks", None)
+            if tasks is None:
+                application.state.inflight_tasks = []
+                tasks = application.state.inflight_tasks
+            tasks.append(task)
+            incident = None
+            for _ in range(250):
+                await asyncio.sleep(0.02)
+                opens = [
+                    i
+                    for i in application.state.store.list_incidents()
+                    if i.status == "open"
+                    and (i.cue.detail or {}).get("fixture") == "path_b_inflight"
+                ]
+                if opens:
+                    incident = opens[-1]
+                    break
+            if incident is None:
+                raise HTTPException(status_code=500, detail="path_b_inflight failed to open")
+            return DemoRunResponse(incident_id=incident.id)
         else:  # pragma: no cover - guarded by SUPPORTED_FIXTURES
             raise HTTPException(status_code=400, detail="unsupported fixture")
         await _publish_cloud(incident)

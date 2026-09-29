@@ -44,6 +44,14 @@ def test_ui_served_with_caregiver_console():
     assert "text/html" in resp.headers["content-type"]
     assert "Caregiver" in resp.text
     assert "Path A" in resp.text
+    assert "Demo scenarios" in resp.text
+    assert "No reading · lens covered" in resp.text
+    assert "path_b_inflight" in resp.text
+    assert "opencv_occlusion" in resp.text
+    assert "response_intent" in resp.text
+    assert "clear_ok" in resp.text
+    assert "Alexa+" not in resp.text
+    assert "Ambient Hearth" not in resp.text
 
 def test_ui_served_with_learning_badge():
     from fastapi.testclient import TestClient
