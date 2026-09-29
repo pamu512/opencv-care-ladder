@@ -144,6 +144,8 @@ def test_opencv_occlusion_fixture_distinct_tool_path():
     assert "distress_heuristic" not in blob
     speaker = next(e for e in inc["events"] if e["tool"] == "speaker_prompt")
     assert speaker["detail"].get("response_intent") in {"unclear", "clear_ok", "needs_human"}
+    duration = (inc.get("explain") or {}).get("duration_sec")
+    assert duration is not None and duration < 60, duration
 
 
 def test_soft_ok_and_needs_human_fixtures():

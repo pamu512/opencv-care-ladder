@@ -847,7 +847,8 @@ function detailText(ev){
   return b.join(" · ");
 }
 function timelineHTML(inc){
-  const start = inc.created_at ? Date.parse(inc.created_at) : null;
+  const firstAt = (inc.events||[]).map(e=>e.at).find(Boolean);
+  const start = firstAt ? Date.parse(firstAt) : (inc.created_at ? Date.parse(inc.created_at) : null);
   const rows = inc.events.map((ev,ix)=>{
     const t = ev.at ? Date.parse(ev.at) : NaN;
     const delta = start && !Number.isNaN(t) ? `+${((t-start)/1000).toFixed(1)}s` : "";
@@ -886,7 +887,7 @@ function renderIncident(inc, frames){
       <span class="inc-id">${esc(inc.id.slice(0,10))}</span>
       <span class="pill ${st.cls}">${icon(inc.status==="resolved"?"i-check":inc.status==="suppressed"?"i-moon":"i-clock")}${esc(st.label)}</span>
       ${cuePill}
-      ${age!=null?`<span class="pill p-plain">aging ${age}m</span>`:""}
+      ${age!=null && age < 180?`<span class="pill p-plain">aging ${age}m</span>`:""}
       <span class="inc-meta">
         <span>household ${esc(inc.household_id)}</span>
         <a class="trace-link" href="/incidents/${esc(inc.id)}" target="_blank" rel="noopener">${icon("i-code")}raw trace</a>

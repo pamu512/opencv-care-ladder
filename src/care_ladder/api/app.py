@@ -110,7 +110,9 @@ def incident_explain(incident) -> dict[str, Any]:
     resolve = next((e for e in events if e.tool == "resolve"), None)
     notify = next((e for e in events if e.tool == "notify_caretaker"), None)
     stamped = [e.at for e in events if e.at is not None]
-    start = incident.created_at or (stamped[0] if stamped else None)
+    # Prefer the audit stamps, not incident.created_at: demo fixtures pin
+    # created_at to DEMO_NOW while events are stamped at request time.
+    start = stamped[0] if stamped else incident.created_at
     end = stamped[-1] if stamped else None
     duration = None
     if start is not None and end is not None:
