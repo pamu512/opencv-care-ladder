@@ -33,7 +33,10 @@ def test_sim_silence_path_tools():
         assert any("start_or_resume_incident" in line for line in log)
         assert any("notify_caretaker" in line for line in log)
         assert any("request_call" in line for line in log)
+        assert any(line.startswith("SESSION ") and "rung=" in line and "status=" in line for line in log)
         assert final.get("status") in {"exhausted", "open"}
+        iids = _incident_ids(log)
+        assert len(iids) == 1, iids
     finally:
         server.should_exit = True
         thread.join(timeout=5)
@@ -65,6 +68,55 @@ def test_sim_needs_human_does_not_resolve():
         assert any("notify_caretaker" in line for line in log)
         assert not any("resolve_incident" in line for line in log)
         assert final.get("status") != "resolved"
+        assert any("resumed" in line and "true" in line.lower() for line in log)
+        assert any(line.startswith("SESSION ") and "rung=" in line and "status=" in line for line in log)
+        iids = _incident_ids(log)
+        assert len(iids) == 1, iids
     finally:
         server.should_exit = True
         thread.join(timeout=5)
+
+
+def test_sim_soft_ok_resumes_same_incident():
+    config = uvicorn.Config(
+        create_app(store=AuditStore()), host="127.0.0.1", port=8793, log_level="error"
+    )
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    for _ in range(50):
+        try:
+            urllib.request.urlopen("http://127.0.0.1:8793/plan", timeout=1)
+            break
+        except Exception:
+            time.sleep(0.2)
+    try:
+        log, final = asyncio.run(
+            run_sim(
+                "http://127.0.0.1:8793",
+                cue_kind="no_movement",
+                answer="don't worry",
+                verbose=False,
+            )
+        )
+        assert any("clear_ok" in line for line in log)
+        assert any("resolve_incident" in line for line in log)
+        assert any("resumed" in line and "true" in line.lower() for line in log)
+        assert any(line.startswith("SESSION ") and "rung=" in line and "status=" in line for line in log)
+        assert final.get("status") == "resolved"
+        iids = _incident_ids(log)
+        assert len(iids) == 1, iids
+    finally:
+        server.should_exit = True
+        thread.join(timeout=5)
+
+
+def _incident_ids(log: list[str]) -> set[str]:
+    ids: set[str] = set()
+    for line in log:
+        if not line.startswith("SESSION "):
+            continue
+        for part in line.split():
+            if part.startswith("incident="):
+                ids.add(part.split("=", 1)[1])
+    return ids

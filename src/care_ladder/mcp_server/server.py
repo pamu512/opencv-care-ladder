@@ -41,6 +41,78 @@ def _session_key(household_id: str, incident_id: str) -> str:
     return f"{household_id}:{incident_id}"
 
 
+def _current_rung(sess: dict[str, Any] | None) -> str | None:
+    if sess is None:
+        return None
+    inc = sess.get("incident")
+    if inc is None:
+        return None
+    if inc.status == "resolved":
+        return "resolve"
+    tools = [e.tool for e in inc.events]
+    last = None
+    for rung in sess.get("rungs") or []:
+        if rung in tools:
+            last = rung
+    if last:
+        return last
+    return tools[-1] if tools else None
+
+
+def _rung_index(sess: dict[str, Any] | None, rung: str | None) -> int | None:
+    if sess is None or not rung:
+        return None
+    rungs = sess.get("rungs") or []
+    try:
+        return rungs.index(rung) + 1
+    except ValueError:
+        return None
+
+
+def session_snapshot(
+    household_id: str,
+    incident_id: str,
+    sess: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """One agent-memory blob reused on every MCP tool return."""
+    if sess is None and household_id and incident_id:
+        sess = _SESSIONS.get(_session_key(household_id, incident_id))
+    tools = [e.tool for e in sess["incident"].events] if sess else []
+    status = sess["incident"].status if sess else "unknown"
+    rung = _current_rung(sess)
+    return {
+        "household_id": household_id,
+        "incident_id": incident_id,
+        "rung": rung,
+        "rung_index": _rung_index(sess, rung),
+        "status": status,
+        "tools": tools,
+    }
+
+
+def _attach_session(
+    payload: dict[str, Any],
+    household_id: str,
+    incident_id: str,
+    sess: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    snap = session_snapshot(household_id, incident_id, sess)
+    if "status" in payload:
+        snap = {**snap, "status": payload["status"]}
+    if "tools" in payload and isinstance(payload["tools"], list):
+        snap = {**snap, "tools": payload["tools"]}
+    return {
+        **payload,
+        "household_id": household_id,
+        "incident_id": incident_id,
+        "rung": snap["rung"],
+        "rung_index": snap["rung_index"],
+        "status": snap["status"],
+        "tools": snap["tools"],
+        "session_snapshot": snap,
+    }
+
+
 @mcp.tool()
 def start_or_resume_incident(
     cue_kind: str,
@@ -55,10 +127,16 @@ def start_or_resume_incident(
     """
     if incident_id and _session_key(household_id, incident_id) in _SESSIONS:
         sess = _SESSIONS[_session_key(household_id, incident_id)]
-        return {"incident_id": sess["incident"].id, "resumed": True,
-                "status": sess["incident"].status, "rungs": sess["rungs"]}
+        return _attach_session(
+            {"incident_id": sess["incident"].id, "resumed": True,
+             "status": sess["incident"].status, "rungs": sess["rungs"]},
+            household_id, sess["incident"].id, sess,
+        )
     if cue_kind not in {"no_movement", "no_visibility", "distress_heuristic"}:
-        return {"error": "invalid cue_kind", "cue_kind": cue_kind}
+        return _attach_session(
+            {"error": "invalid cue_kind", "cue_kind": cue_kind},
+            household_id, incident_id or "",
+        )
     plan = load_care_plan(_AMAZON_PLAN)
     iid = incident_id or uuid.uuid4().hex
     cue = CueEvent(
@@ -83,8 +161,11 @@ def start_or_resume_incident(
         "incident": incident,
         "rungs": [r.tool for r in plan.rungs],
     }
-    return {"incident_id": iid, "resumed": False, "status": incident.status,
-            "rungs": [r.tool for r in plan.rungs]}
+    return _attach_session(
+        {"incident_id": iid, "resumed": False, "status": incident.status,
+         "rungs": [r.tool for r in plan.rungs]},
+        household_id, iid,
+    )
 
 
 @mcp.tool()
@@ -104,13 +185,17 @@ def check_in_prompt(household_id: str, incident_id: str, utterance: str) -> dict
 
     intent = classify_response_intent(utterance)
     kind = intent_to_reply_kind(intent, utterance)
-    return {
-        "incident_id": incident_id,
-        "reply_kind": kind,
-        "response_intent": intent,
-        "intent_label": intent_label(intent),
-        "raw": utterance,
-    }
+    return _attach_session(
+        {
+            "incident_id": incident_id,
+            "reply_kind": kind,
+            "response_intent": intent,
+            "intent_label": intent_label(intent),
+            "raw": utterance,
+        },
+        household_id,
+        incident_id,
+    )
 
 
 @mcp.tool()
@@ -118,10 +203,16 @@ def advance_rung(household_id: str, incident_id: str) -> dict[str, Any]:
     """Advance the incident to its next rung (silence / no-answer path)."""
     sess = _SESSIONS.get(_session_key(household_id, incident_id))
     if sess is None:
-        return {"error": "unknown incident", "incident_id": incident_id}
+        return _attach_session(
+            {"error": "unknown incident", "incident_id": incident_id},
+            household_id, incident_id,
+        )
     tools = [e.tool for e in sess["incident"].events]
-    return {"incident_id": incident_id, "advanced_to": sess["rungs"][-1],
-            "events_so_far": tools}
+    return _attach_session(
+        {"incident_id": incident_id, "advanced_to": sess["rungs"][-1],
+         "events_so_far": tools},
+        household_id, incident_id, sess,
+    )
 
 
 @mcp.tool()
@@ -131,9 +222,15 @@ def resolve_incident(
     """Resolve an incident (voice OK or caretaker acknowledge)."""
     sess = _SESSIONS.get(_session_key(household_id, incident_id))
     if sess is None:
-        return {"error": "unknown incident", "incident_id": incident_id}
+        return _attach_session(
+            {"error": "unknown incident", "incident_id": incident_id},
+            household_id, incident_id,
+        )
     if sess["incident"].status == "resolved":
-        return {"error": "already_resolved", "incident_id": incident_id}
+        return _attach_session(
+            {"error": "already_resolved", "incident_id": incident_id},
+            household_id, incident_id, sess,
+        )
     sess["incident"].status = "resolved"
     sess["incident"].events.append(
         type(sess["incident"].events[0])(
@@ -141,7 +238,10 @@ def resolve_incident(
             detail={"reason": reason, "via": "mcp"},
         )
     ) if sess["incident"].events else None
-    return {"incident_id": incident_id, "status": "resolved", "reason": reason}
+    return _attach_session(
+        {"incident_id": incident_id, "status": "resolved", "reason": reason},
+        household_id, incident_id, sess,
+    )
 
 
 @mcp.tool()
@@ -149,15 +249,21 @@ def get_incident_status(household_id: str, incident_id: str) -> dict[str, Any]:
     """Return the incident's status, cue, and audit-trail tool sequence."""
     sess = _SESSIONS.get(_session_key(household_id, incident_id))
     if sess is None:
-        return {"error": "unknown incident", "incident_id": incident_id}
+        return _attach_session(
+            {"error": "unknown incident", "incident_id": incident_id},
+            household_id, incident_id,
+        )
     inc = sess["incident"]
-    return {
-        "incident_id": inc.id,
-        "status": inc.status,
-        "cue_kind": inc.cue.kind,
-        "tools": [e.tool for e in inc.events],
-        "rungs": sess["rungs"],
-    }
+    return _attach_session(
+        {
+            "incident_id": inc.id,
+            "status": inc.status,
+            "cue_kind": inc.cue.kind,
+            "tools": [e.tool for e in inc.events],
+            "rungs": sess["rungs"],
+        },
+        household_id, inc.id, sess,
+    )
 
 
 @mcp.tool()
@@ -165,7 +271,10 @@ def notify_caretaker(household_id: str, incident_id: str) -> dict[str, Any]:
     """Notify the caretaker (push mock + Fire TV). Demo-simulated, no real push."""
     sess = _SESSIONS.get(_session_key(household_id, incident_id))
     if sess is None:
-        return {"error": "unknown incident", "incident_id": incident_id}
+        return _attach_session(
+            {"error": "unknown incident", "incident_id": incident_id},
+            household_id, incident_id,
+        )
     inc = sess["incident"]
     inc.events.append(
         type(inc.events[0])(
@@ -173,8 +282,11 @@ def notify_caretaker(household_id: str, incident_id: str) -> dict[str, Any]:
             detail={"channels": ["push_mock", "fire_tv"], "simulated": True, "via": "mcp"},
         )
     ) if inc.events else None
-    return {"incident_id": inc.id, "notified": True, "channels": ["push_mock", "fire_tv"],
-            "simulated": True}
+    return _attach_session(
+        {"incident_id": inc.id, "notified": True, "channels": ["push_mock", "fire_tv"],
+         "simulated": True},
+        household_id, inc.id, sess,
+    )
 
 
 @mcp.tool()
@@ -182,14 +294,20 @@ def request_call(household_id: str, incident_id: str) -> dict[str, Any]:
     """Request a call to the caregiver's reserved fictional number. Simulated only."""
     sess = _SESSIONS.get(_session_key(household_id, incident_id))
     if sess is None:
-        return {"error": "unknown incident", "incident_id": incident_id}
+        return _attach_session(
+            {"error": "unknown incident", "incident_id": incident_id},
+            household_id, incident_id,
+        )
     plan = load_care_plan(_AMAZON_PLAN)
-    return {
-        "incident_id": incident_id,
-        "phone_e164": plan.caregiver.phone_e164,
-        "simulated": True,
-        "note": "demo_stub_no_real_dial",
-    }
+    return _attach_session(
+        {
+            "incident_id": incident_id,
+            "phone_e164": plan.caregiver.phone_e164,
+            "simulated": True,
+            "note": "demo_stub_no_real_dial",
+        },
+        household_id, incident_id, sess,
+    )
 
 
 def mount_path() -> str:
@@ -197,4 +315,4 @@ def mount_path() -> str:
     return "/mcp"
 
 
-__all__ = ["mcp", "mount_path"]
+__all__ = ["mcp", "mount_path", "session_snapshot"]
