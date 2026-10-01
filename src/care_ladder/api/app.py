@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
+import hmac
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import cv2
 import numpy as np
 import asyncio
 
-from fastapi import FastAPI, HTTPException, Response, UploadFile
+from fastapi import FastAPI, HTTPException, Request, Response, UploadFile
 from uuid import uuid4
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -286,6 +287,39 @@ async def _run_opencv_occlusion(store: AuditStore):
     )
 
 
+# Speaker listen + family page are capped by the fixture's max_wait_sec (25s).
+# A 5s poll (250 * 20ms) returned "failed to page" before family_paged was saved.
+_INFLIGHT_POLL_BUDGET_SEC = 25.0
+_INFLIGHT_POLL_STEP_SEC = 0.02
+
+
+def _inflight_poll_steps() -> int:
+    return round(_INFLIGHT_POLL_BUDGET_SEC / _INFLIGHT_POLL_STEP_SEC)
+
+
+async def _poll_inflight_open(store: AuditStore, match: Callable[..., bool]):
+    """Wait until an open fixture incident matches, or the poll budget elapses."""
+    for _ in range(_inflight_poll_steps()):
+        await asyncio.sleep(_INFLIGHT_POLL_STEP_SEC)
+        found = [i for i in store.list_incidents() if match(i)]
+        if found:
+            return found[-1]
+    return None
+
+
+def _is_open_fixture(incident: Any, fixture: str, *, family_paged: bool = False) -> bool:
+    if incident.status != "open":
+        return False
+    if (incident.cue.detail or {}).get("fixture") != fixture:
+        return False
+    if not family_paged:
+        return True
+    return any(
+        e.tool == "bot" and (e.detail or {}).get("state") == "family_paged"
+        for e in incident.events
+    )
+
+
 async def _run_path_b_inflight(store: AuditStore, *, max_wait_sec: float = 25.0):
     """Path B left open on the notify rung so a caregiver can ack mid-ladder."""
     plan = load_care_plan(_DEMO_PLAN_PATH)
@@ -554,6 +588,24 @@ def _bind_family_channel(store: AuditStore) -> tuple[TelegramAdapter, BotRegistr
     return adapter, registry
 
 
+def _webhook_secret_rejection(request: Request, *, configured: bool) -> str | None:
+    """Reject live webhook updates that fail the secret check.
+
+    Stub mode (no bot token) skips the check. When a token is set, missing
+    ``TELEGRAM_WEBHOOK_SECRET`` or a header mismatch fails closed.
+    """
+    if not configured:
+        return None
+    expected = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "").strip()
+    if not expected:
+        return "webhook_secret_unset"
+    presented = request.headers.get("x-telegram-bot-api-secret-token", "")
+    # Bytes so a non-ASCII secret or a length mismatch cannot raise.
+    if not hmac.compare_digest(presented.encode("utf-8"), expected.encode("utf-8")):
+        return "webhook_secret_mismatch"
+    return None
+
+
 def create_app(store: AuditStore | None = None) -> FastAPI:
     """Build FastAPI app with injectable store (tests inject a fresh memory store)."""
     audit = store if store is not None else _default_store()
@@ -668,7 +720,10 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
             "note": (
                 None
                 if token_set
-                else "Telegram is stub-mode. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID for live send."
+                else (
+                    "Telegram is stub-mode. Set TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, "
+                    "and TELEGRAM_WEBHOOK_SECRET for live send."
+                )
             ),
         }
 
@@ -745,11 +800,16 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
         }
 
     @application.post("/telegram/webhook")
-    async def telegram_webhook(update: dict[str, Any]) -> dict[str, Any]:
+    async def telegram_webhook(update: dict[str, Any], request: Request) -> dict[str, Any]:
         """Telegram callback/text ack. Stub mode is honest and never retries-storms."""
         adapter: TelegramAdapter = application.state.telegram
         registry: BotRegistry = application.state.bot_registry
         token_set = bool(getattr(adapter, "token", None))
+        # Fail closed before inbox append or ack. 200 (not 401) matches the
+        # unconfigured path so a bad secret does not trigger Telegram retries.
+        rejected = _webhook_secret_rejection(request, configured=token_set)
+        if rejected is not None:
+            return {"ok": False, "applied": False, "reason": rejected}
         inbox = getattr(adapter, "inbox", None)
         if isinstance(inbox, list):
             inbox.append(update)
@@ -1052,18 +1112,10 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
                 application.state.inflight_tasks = []
                 tasks = application.state.inflight_tasks
             tasks.append(task)
-            incident = None
-            for _ in range(250):
-                await asyncio.sleep(0.02)
-                opens = [
-                    i
-                    for i in application.state.store.list_incidents()
-                    if i.status == "open"
-                    and (i.cue.detail or {}).get("fixture") == "path_b_inflight"
-                ]
-                if opens:
-                    incident = opens[-1]
-                    break
+            incident = await _poll_inflight_open(
+                application.state.store,
+                lambda i: _is_open_fixture(i, "path_b_inflight"),
+            )
             if incident is None:
                 raise HTTPException(status_code=500, detail="path_b_inflight failed to open")
             return DemoRunResponse(incident_id=incident.id)
@@ -1076,22 +1128,10 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
                 application.state.inflight_tasks = []
                 tasks = application.state.inflight_tasks
             tasks.append(task)
-            incident = None
-            for _ in range(250):
-                await asyncio.sleep(0.02)
-                opens = [
-                    i
-                    for i in application.state.store.list_incidents()
-                    if i.status == "open"
-                    and (i.cue.detail or {}).get("fixture") == "family_paged_inflight"
-                    and any(
-                        e.tool == "bot" and (e.detail or {}).get("state") == "family_paged"
-                        for e in i.events
-                    )
-                ]
-                if opens:
-                    incident = opens[-1]
-                    break
+            incident = await _poll_inflight_open(
+                application.state.store,
+                lambda i: _is_open_fixture(i, "family_paged_inflight", family_paged=True),
+            )
             if incident is None:
                 raise HTTPException(status_code=500, detail="family_paged_inflight failed to page")
             return DemoRunResponse(incident_id=incident.id)

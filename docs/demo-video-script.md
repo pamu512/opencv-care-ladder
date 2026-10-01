@@ -6,7 +6,9 @@ Word-for-word VO in the right column - read it verbatim or paraphrase lightly; i
 ## Pre-record setup (do all of this BEFORE hitting record)
 
 1. `cd ~/Documents/GitHub/opencv-care-ladder && ./scripts/run_demo.sh` - local UI at `http://localhost:8000/ui/` (use local, not AWS, for Paths A/B so timing is instant).
-2. **Pre-seed the fall incident (critical):** upload `clips/kul_fall_1.avi` once via the local UI and let it finish (~2–4 min on your M-series Mac, faster than cloud). Keep that completed incident - it's your cut-in footage for the fall beat. Also have the production one ready: `https://d2u7pls4da2poz.cloudfront.net/incidents/8d528632736a4548992c7b1acb724ba1`.
+2. **Pre-seed the fall incident (critical):** upload `clips/kul_fall_1.avi` and let it finish before you record (~2–4 min on an M-series Mac). Keep that completed incident — it is the cut-in for the fall beat. Re-seed on the machine you are recording; do not reuse a published CloudFront incident id (those links go stale).
+   - Local UI: `http://localhost:8000/ui/` → upload `clips/kul_fall_1.avi`.
+   - API: `curl -s -X POST http://127.0.0.1:8000/demo/upload -F "file=@clips/kul_fall_1.avi"` then poll `GET /demo/upload/{job_id}` until `status` is `done` and open `incident_id`. Confirm the cue is `distress_heuristic` (`sudden_vertical_to_horizontal`).
 3. Browser: two tabs - Tab 1 local `/ui/`, Tab 2 the pre-seeded fall incident. Editor tab with `configs/demo_home.yaml`. Terminal tab with `tests/fixtures/basketball1.png` in `open .` Finder (or just the repo open).
 4. Record 1440p+, browser zoom ~125%. Full-screen the browser; hide bookmarks bar.
 5. Microphone test - the VO below is ~640 words; a dry read should land at 4:45.
@@ -38,7 +40,7 @@ Word-for-word VO in the right column - read it verbatim or paraphrase lightly; i
 ## Cut-in cheatsheet (edit-time saves)
 
 - The fall analysis takes minutes in real time - **never show it wall-clock**. Cut from "upload started" (progress bar visible) straight to the pre-seeded completed incident.
-- If the local fall seed misbehaves, use the production incident `8d528632…` - verified live, full telemetry.
+- If the local fall seed misbehaves, re-seed `clips/kul_fall_1.avi` via `/ui/` or `POST /demo/upload` and wait until `GET /demo/upload/{job_id}` reports `done` with a `distress_heuristic` incident. Do not cut to a stale CloudFront incident id.
 - Zooms: timeline sections in shots 4–5, pose chips in shot 7. 150%+ browser zoom reads better than post-zoom.
 - Mistakes in 4/5/6: just re-click the button - incidents append; use the newest card, crop the older ones in edit.
 - Numbers to say exactly: **recall 1.0 · zero false escalations · torso ~70° · 1-in-4 fall statistic**.

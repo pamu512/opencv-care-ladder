@@ -155,6 +155,21 @@ _CUE_CARD_LABEL = {
 }
 
 
+def _close_calling_thread(incident: Incident, events: list[AuditEvent], cue: CueEvent) -> None:
+    """Close a BotThread left on calling_N after dial resolve or exhaust.
+
+    ``/family/runtime`` mirrors the latest thread. Without this, a resolved
+    dial stays on ``calling_1``.
+    """
+    thread = incident.__dict__.get("_bot_thread")
+    if thread is None or not str(thread.state.value).startswith("calling_"):
+        return
+    reason = "dial_answered" if incident.status == "resolved" else "dial_exhausted"
+    seen = len(thread.audit_events())
+    thread.close(reason)
+    _flush_bot_audit(thread, events, cue, seen)
+
+
 def _flush_bot_audit(thread: BotThread, events: list[AuditEvent], cue: CueEvent, seen: int) -> int:
     raw = thread.audit_events()
     for item in raw[seen:]:
@@ -849,6 +864,7 @@ async def run_incident(
 
     if incident.status == "open":
         incident.status = "exhausted"
+    _close_calling_thread(incident, events, cue)
 
     # Adaptive schedule learning (spec 2026-09-27 section 5): record outcome
     # on every closed incident and audit the profile state. Learning never
