@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from care_ladder.audit.store import AuditStore
+from care_ladder.channels.bot import BotRegistry, BotState
 from care_ladder.channels.dial import StubDialer
 from care_ladder.channels.speaker import SpeakerSimulator
 from care_ladder.channels.telegram_adapter import FakeTelegram
@@ -193,3 +194,42 @@ def test_occlusion_pages_health_but_never_dials():
     resolve = next(e for e in incident.events if e.tool == "resolve")
     assert resolve.detail.get("reason") == "camera_health_informed"
     assert resolve.detail.get("distress_claimed") is False
+
+
+def test_dial_answered_and_exhausted_close_calling_thread():
+    """/family/runtime must not stick on calling_1 after dial resolve or exhaust."""
+
+    def _run(behavior: dict[str, str]):
+        store = AuditStore()
+        registry = BotRegistry()
+        incident = asyncio.run(
+            run_incident(
+                cue=CueEvent(kind="no_movement", confidence=0.9, detail={"fixture": "dial_close"}),
+                plan=_plan(countdown=0.2, pressure_remaining=0.1),
+                speaker=SpeakerSimulator(scripted=[""]),
+                dialer=StubDialer(behavior=behavior),
+                pre_event_frames=[],
+                store=store,
+                now=DAYTIME,
+                max_wait_sec=1.0,
+                telegram=FakeTelegram(),
+                bot_registry=registry,
+            )
+        )
+        thread = registry.get(incident.id)
+        assert thread is not None
+        assert thread.state is BotState.closed
+        assert _bot_states(incident)[-1] == "closed"
+        return incident, thread
+
+    answered, answered_thread = _run({"caregiver": "answered"})
+    assert answered.status == "resolved"
+    assert answered_thread.close_reason == "dial_answered"
+    reasons = [e.detail.get("reason") for e in answered.events if e.tool == "resolve"]
+    assert "dial_answered" in reasons
+
+    exhausted, exhausted_thread = _run(
+        {"caregiver": "no_answer", "secondary": "no_answer"}
+    )
+    assert exhausted.status == "exhausted"
+    assert exhausted_thread.close_reason == "dial_exhausted"

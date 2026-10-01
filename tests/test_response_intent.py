@@ -42,5 +42,34 @@ def test_intent_llm_off_by_default(monkeypatch):
     monkeypatch.delenv("CARE_LADDER_INTENT_LLM", raising=False)
     assert intent_llm_enabled() is False
     monkeypatch.setenv("CARE_LADDER_INTENT_LLM", "1")
-    # Gate may read true, but classification stays deterministic.
     assert classify_response_intent("don't worry") == "clear_ok"
+
+
+def test_negation_of_ok_is_not_clear_ok():
+    negated = (
+        "I'm not ok",
+        "im not okay",
+        "I'm not fine",
+        "no I'm not fine",
+        "nothing is ok",
+        "I am not okay",
+        "isn't ok",
+        "not fine",
+        "never okay",
+        "wasn't fine",
+        "I am not fine at all",
+        "no ok",
+    )
+    assert len(negated) >= 8
+    for phrase in negated:
+        assert classify_response_intent(phrase) != "clear_ok", phrase
+    # Negation after the OK token, and soft-OK phrases that contain "not"/"n't".
+    for phrase in (
+        "I'm ok",
+        "I'm fine",
+        "don't worry",
+        "do not worry",
+        "I'm fine, no problem",
+        "Dont worry, I'm fine",
+    ):
+        assert classify_response_intent(phrase) == "clear_ok", phrase

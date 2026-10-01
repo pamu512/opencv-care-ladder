@@ -61,3 +61,82 @@ def test_webhook_callback_acks_family_paged_and_prevents_dial():
         reasons = [e["detail"].get("reason") for e in closed["events"] if e["tool"] == "resolve"]
         assert "family_ack" in reasons or "caregiver_ack" in reasons
         assert "dial_contact" not in [e["tool"] for e in closed["events"]]
+
+
+def _configured_store() -> AuditStore:
+    """FakeTelegram stamped configured so webhook auth runs without a socket."""
+    from care_ladder.channels.telegram_adapter import FakeTelegram
+
+    store = AuditStore()
+    adapter = FakeTelegram()
+    adapter.token = "test-token-not-live"
+    store.telegram = adapter
+    return store
+
+
+def test_inflight_poll_budget_covers_slow_family_page():
+    from care_ladder.api.app import _INFLIGHT_POLL_BUDGET_SEC, _inflight_poll_steps
+
+    assert _INFLIGHT_POLL_BUDGET_SEC >= 20.0
+    assert _inflight_poll_steps() >= 1000
+
+
+def test_configured_webhook_rejects_bad_secret(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "expected-secret")
+    store = _configured_store()
+    with TestClient(create_app(store=store)) as client:
+        r = client.post("/demo/run", json={"fixture": "family_paged_inflight"})
+        assert r.status_code == 200, r.text
+        iid = r.json()["incident_id"]
+        bad = client.post(
+            "/telegram/webhook",
+            json={"callback_query": {"data": "ack:1", "message": {"chat": {"id": 1}}}},
+            headers={"X-Telegram-Bot-Api-Secret-Token": "wrong"},
+        )
+        assert bad.status_code == 200
+        body = bad.json()
+        assert body["ok"] is False
+        assert body["applied"] is False
+        assert body["reason"] == "webhook_secret_mismatch"
+        missing = client.post(
+            "/telegram/webhook",
+            json={"callback_query": {"data": "ack:1"}},
+        )
+        assert missing.json()["reason"] == "webhook_secret_mismatch"
+        opened = client.get(f"/incidents/{iid}").json()
+        reasons = [e["detail"].get("reason") for e in opened["events"] if e["tool"] == "resolve"]
+        assert "family_ack" not in reasons
+        assert store.telegram.inbox == []
+
+
+def test_configured_webhook_rejects_when_secret_unset(monkeypatch):
+    monkeypatch.delenv("TELEGRAM_WEBHOOK_SECRET", raising=False)
+    with TestClient(create_app(store=_configured_store())) as client:
+        r = client.post(
+            "/telegram/webhook",
+            json={"message": {"text": "1"}},
+            headers={"X-Telegram-Bot-Api-Secret-Token": "anything"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["ok"] is False
+        assert body["applied"] is False
+        assert body["reason"] == "webhook_secret_unset"
+
+
+def test_configured_webhook_applies_matching_secret(monkeypatch):
+    monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "expected-secret")
+    with TestClient(create_app(store=_configured_store())) as client:
+        r = client.post("/demo/run", json={"fixture": "family_paged_inflight"})
+        assert r.status_code == 200, r.text
+        iid = r.json()["incident_id"]
+        w = client.post(
+            "/telegram/webhook",
+            json={"callback_query": {"data": "ack:1", "message": {"chat": {"id": 1}}}},
+            headers={"X-Telegram-Bot-Api-Secret-Token": "expected-secret"},
+        )
+        assert w.status_code == 200
+        body = w.json()
+        assert body["ok"] is True
+        assert body.get("applied") is True
+        assert body.get("incident_id") == iid

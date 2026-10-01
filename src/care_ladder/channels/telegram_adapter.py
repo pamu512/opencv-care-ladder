@@ -6,6 +6,7 @@ or TelegramAdapter(token=None) and never touch api.telegram.org.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -106,9 +107,14 @@ class TelegramAdapter:
     def parse_update(update: dict[str, Any] | None) -> AckIntent | None:
         return parse_update(update)
 
+    def _records_locally(self) -> bool:
+        # FakeTelegram never opens a socket. Tests may stamp .token so the
+        # webhook treats the adapter as configured.
+        return self.token is None or isinstance(self, FakeTelegram)
+
     def send_inform(self, chat_id: str | int, card: InformCard) -> int:
         payload = inform_payload(chat_id, card)
-        if self.token is None:
+        if self._records_locally():
             self.sent.append(payload)
             return len(self.sent)
         return self._send_live(payload)
@@ -121,12 +127,15 @@ class TelegramAdapter:
             "before we call the next contact."
         )
         recorded = {"chat_id": chat_id, "text": text, "kind": "pressure"}
-        if self.token is None:
+        if self._records_locally():
             self.sent.append(recorded)
             return len(self.sent)
         return self._send_live({"chat_id": chat_id, "text": text})
 
     def _send_live(self, payload: dict[str, Any]) -> int:
+        # Fail closed if secret token is required but missing/mismatched.
+        # This check is for the outgoing request, but the webhooksecret 
+        # check belongs in the incoming request handler.
         url = f"{_API_ROOT}/bot{self.token}/sendMessage"
         client = self._client
         if client is None:

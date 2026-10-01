@@ -124,11 +124,12 @@ Family page after speaker silence: `idle → speaker_window → family_paged →
 Without credentials the runtime stays on **FakeTelegram / stub** (CI and CloudFront stay deterministic).
 
 ```bash
-export TELEGRAM_BOT_TOKEN=...   # opt-in live Bot API
-export TELEGRAM_CHAT_ID=...     # family chat
+export TELEGRAM_BOT_TOKEN=...       # opt-in live Bot API
+export TELEGRAM_CHAT_ID=...         # family chat
+export TELEGRAM_WEBHOOK_SECRET=...  # required once the token is set
 ```
 
-Webhook: `POST /telegram/webhook` (callback `ack:N` or text `1|2|3`). Unconfigured: `200 {"ok":false,"reason":"telegram_not_configured"}`. Vision still picks the next tools; Telegram is confirm-before-escalate, not a replacement for OpenCV cues.
+Webhook: `POST /telegram/webhook` (callback `ack:N` or text `1|2|3`). Unconfigured (no token): `200 {"ok":false,"reason":"telegram_not_configured"}` — the secret header is not required. When `TELEGRAM_BOT_TOKEN` is set, the handler checks `X-Telegram-Bot-Api-Secret-Token` against `TELEGRAM_WEBHOOK_SECRET` before applying an ack or enqueueing the update. A missing secret or a mismatch returns `200 {"ok":false,"applied":false,...}` and does not ack (fail closed, without a non-200 that would make Telegram retry). Vision still picks the next tools; Telegram is confirm-before-escalate, not a replacement for OpenCV cues.
 
 - **Path A: verbal OK** (`no_movement_ok`) - check-in clears, no dial.
 - **Path B: silence → escalate** (`no_movement_silence`) - notify then dial stubs, jumps logged.
