@@ -6,7 +6,7 @@ versioned artifact for later sibling consume PRs. Not a diagnosis.
 ## Artifact
 
 - File: `models/fall_cls_v1.onnx`
-- SHA256: `3c37eb7c899846bdf01d1d56bd38629862c5e253c606c1d72a896cd851c8989b`
+- SHA256: `549721e2b29cad10776fde2cb6186cf19383f982050f37e9335096c1aaadb608`
 - Input: `images` float32 NCHW, 3x32x32, BGR resize then /255
 - Output: `scores` softmax `[no_fall, fall]`
 - Stack: numpy-trained depthwise-separable CNN, ONNX opset 13, Apache-2.0 (OpenCV DNN)
@@ -18,11 +18,11 @@ versioned artifact for later sibling consume PRs. Not a diagnosis.
 - Family search: https://www.kaggle.com/datasets?search=fall&tags=13207-Computer+Vision
 - Train slug (commercial-permissive, verified at download): `elwalyahmad/fall-detection`
 - Eval-only slug: `uttejkumarkandagatla/fall-detection-dataset`
-- Domain of this card: **fixture**
-- Image root: `tests/fixtures/fall_cls`
-- Split: Seeded stratified 70/15/15 grouped by video/subject id when those tokens exist in the path.
+- Domain of this card: **kaggle**
+- Image root: `/Users/pamu/Documents/GitHub/opencv-care-ladder-kaggle-retrain/datasets/elwalyahmad-fall-detection`
+- Split: Video or subject ids were absent, so the split is per-frame (MODEL_CARD required note).
 - Seed: 47
-- Counts: train=16 val=8 test=8
+- Counts: train=743 val=159 test=159
 - Written: 2026-10-04
 
 ## In-domain metrics
@@ -31,15 +31,15 @@ Target fall sensitivity: 0.85 (report target, not a hard ship gate).
 
 | split | n | sensitivity | specificity | accuracy | confusion |
 | --- | --- | --- | --- | --- | --- |
-| train | 16 | 1.000 | 1.000 | 1.000 | tn=8 fp=0 fn=0 tp=8 |
-| val | 8 | 0.750 | 1.000 | 0.875 | tn=4 fp=0 fn=1 tp=3 |
-| test | 8 | 1.000 | 1.000 | 1.000 | tn=4 fp=0 fn=0 tp=4 |
+| train | 743 | 0.745 | 0.664 | 0.720 | tn=150 fp=76 fn=132 tp=385 |
+| val | 159 | 0.730 | 0.729 | 0.730 | tn=35 fp=13 fn=30 tp=81 |
+| test | 159 | 0.664 | 0.735 | 0.686 | tn=36 fp=13 fn=37 tp=73 |
 
-Sensitivity meets the 0.85 report target on fixture bars. This cloud run had no KAGGLE_CONFIG_DIR, so weights are fixture-trained, not in-domain Kaggle. Re-run `python scripts/train_fall_cls.py --kaggle` with credentials for real in-domain and cross-dataset numbers. Not a clinical claim.
+In-domain Kaggle sensitivity is below the 0.85 target. Cause: small frame set, grouped split (no video leak), and a tiny edge CNN trained on CPU. Not a ship-blocking gate; see confusion matrix above.
 
 ## Cross-dataset
 
-Cross-dataset eval (`uttejkumarkandagatla/fall-detection-dataset`) was not run. The set stays eval-only (not in the training mix). `--kaggle` downloads it when KAGGLE_CONFIG_DIR is set.
+Cross-dataset eval on `uttejkumarkandagatla/fall-detection-dataset` (eval-only, not in the training mix): n=474 sensitivity=0.522 specificity=0.667 accuracy=0.582 confusion tn=132 fp=66 fn=132 tp=144. No ship threshold on this number.
 
 ## License
 
