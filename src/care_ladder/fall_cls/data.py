@@ -44,6 +44,91 @@ def infer_label(path: Path) -> int | None:
     return None
 
 
+def _name_to_label(name: str) -> int | None:
+    text = name.lower()
+    if _FALL_NEG.search(text) or any(tok in text for tok in ("walk", "sit", "stand")):
+        return 0
+    if "fall" in text or "lay" in text:
+        return 1
+    return None
+
+
+def _parse_yaml_names(text: str) -> list[str] | None:
+    names: list[str] = []
+    inline = re.search(r"names\s*:\s*\[([^\]]+)\]", text)
+    if inline:
+        return [part.strip().strip("'\"") for part in inline.group(1).split(",") if part.strip()]
+    in_names = False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("names:"):
+            in_names = True
+            rest = line[6:].strip()
+            if rest.startswith("[") and rest.endswith("]"):
+                return [part.strip().strip("'\"") for part in rest[1:-1].split(",") if part.strip()]
+            continue
+        if in_names:
+            if not line or line.startswith("#"):
+                continue
+            if re.match(r"^\d+\s*:", line):
+                names.append(line.split(":", 1)[1].strip().strip("'\""))
+                continue
+            if line.startswith("-"):
+                names.append(line[1:].strip().strip("'\""))
+                continue
+            break
+    return names or None
+
+
+def load_class_names(root: Path) -> list[str] | None:
+    candidates = [root / "data.yaml", root / "data.yml", *sorted(root.rglob("data.yaml"))]
+    for path in candidates:
+        if path.is_file():
+            parsed = _parse_yaml_names(path.read_text(errors="ignore"))
+            if parsed:
+                return parsed
+    return None
+
+
+def yolo_label_path(image: Path) -> Path | None:
+    sidecar = image.with_suffix(".txt")
+    if sidecar.is_file():
+        return sidecar
+    parts = list(image.parts)
+    if "images" in parts:
+        idx = parts.index("images")
+        alt = Path(*parts[:idx], "labels", *parts[idx + 1 : -1], image.stem + ".txt")
+        if alt.is_file():
+            return alt
+    nested = image.parent.parent / "labels" / image.parent.name / f"{image.stem}.txt"
+    if nested.is_file():
+        return nested
+    return None
+
+
+def infer_label_from_yolo(path: Path, class_names: list[str] | None = None) -> int | None:
+    txt = yolo_label_path(path)
+    if txt is None:
+        return None
+    ids: list[int] = []
+    for line in txt.read_text(errors="ignore").splitlines():
+        bits = line.split()
+        if bits:
+            try:
+                ids.append(int(float(bits[0])))
+            except ValueError:
+                continue
+    if not ids:
+        return None
+    if class_names:
+        mapped = [_name_to_label(class_names[i]) for i in ids if 0 <= i < len(class_names)]
+        mapped = [m for m in mapped if m is not None]
+        if not mapped:
+            return None
+        return 1 if 1 in mapped else 0
+    return 1 if 0 in ids else 0
+
+
 def infer_group(path: Path) -> str:
     id_parts = [part for part in path.parts[:-1] if _GROUP_ID.match(part)]
     if id_parts:
@@ -55,10 +140,13 @@ def infer_group(path: Path) -> str:
 
 def index_image_dir(root: Path) -> list[Sample]:
     samples: list[Sample] = []
+    names = load_class_names(root)
     for path in sorted(root.rglob("*")):
         if not path.is_file() or path.suffix.lower() not in IMAGE_SUFFIXES:
             continue
         label = infer_label(path)
+        if label is None:
+            label = infer_label_from_yolo(path, names)
         if label is None:
             continue
         samples.append(Sample(path=path, label=int(label), group=infer_group(path)))

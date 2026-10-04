@@ -7,12 +7,36 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from care_ladder.fall_cls.data import Split, dedupe_samples, index_image_dir, stratified_group_split, write_fixture_tree
+from care_ladder.fall_cls.data import (
+    IMAGE_SUFFIXES,
+    Split,
+    dedupe_samples,
+    index_image_dir,
+    stratified_group_split,
+    write_fixture_tree,
+)
 from care_ladder.fall_cls.licenses import EVAL_SLUG, SEARCH_URL, TRAIN_SLUG
 from care_ladder.fall_cls.manifest import metadata_sha256, pin_record, sha256_file, sha256_tree
-from care_ladder.fall_cls.model import Metrics, evaluate, export_onnx, train_classifier
+from care_ladder.fall_cls.model import Metrics, evaluate, export_onnx, is_collapsed, train_classifier
 
 REPO = Path(__file__).resolve().parents[3]
+
+
+def _has_images(root: Path) -> bool:
+    if not Path(root).is_dir():
+        return False
+    return any(path.suffix.lower() in IMAGE_SUFFIXES for path in Path(root).rglob("*"))
+
+
+def prepare_kaggle_roots(repo: Path, *, downloader) -> tuple[Path, Path]:
+    """Download train + eval-only slugs when the local trees are empty."""
+    train_root = Path(repo) / "datasets" / TRAIN_SLUG.replace("/", "-")
+    eval_root = Path(repo) / "datasets" / EVAL_SLUG.replace("/", "-")
+    if not _has_images(train_root):
+        downloader("train")
+    if not _has_images(eval_root):
+        downloader("eval")
+    return train_root, eval_root
 
 
 def run_fixture_train(
@@ -27,10 +51,13 @@ def run_fixture_train(
     samples = write_fixture_tree(root, n_per_class=n_per_class, seed=seed)
     samples = dedupe_samples(samples)
     split = stratified_group_split(samples, seed=seed)
-    model = train_classifier(split.train or samples, seed=seed, epochs=epochs)
-    train_m = evaluate(model, split.train or samples)
+    train_s = split.train or samples
+    model = train_classifier(train_s, seed=seed, epochs=epochs, val_samples=split.val or None)
+    train_m = evaluate(model, train_s)
     val_m = evaluate(model, split.val or samples)
     test_m = evaluate(model, split.test or samples)
+    if is_collapsed(train_m):
+        raise RuntimeError(f"fixture train collapsed to one class: {train_m}")
     onnx_path = repo / "models" / "fall_cls_v1.onnx"
     export_onnx(model, onnx_path)
     write_model_card(
@@ -65,10 +92,15 @@ def run_kaggle_train(
     if len(samples) < 8:
         raise RuntimeError(f"not enough labeled images under {image_root} ({len(samples)})")
     split = stratified_group_split(samples, seed=seed)
-    model = train_classifier(split.train, seed=seed, epochs=epochs)
+    model = _fit_not_collapsed(split, seed=seed, epochs=epochs)
     train_m = evaluate(model, split.train)
     val_m = evaluate(model, split.val)
     test_m = evaluate(model, split.test)
+    if is_collapsed(train_m) and (not split.val or is_collapsed(val_m)):
+        raise RuntimeError(
+            "refusing to export a collapsed classifier (always one class). "
+            f"train={train_m} val={val_m}"
+        )
     cross = None
     if eval_root is not None and Path(eval_root).exists():
         ev = dedupe_samples(index_image_dir(Path(eval_root)))
@@ -90,6 +122,27 @@ def run_kaggle_train(
         image_root=image_root,
     )
     return {"onnx": str(onnx_path), "train": train_m, "val": val_m, "test": test_m, "cross": cross}
+
+
+def _fit_not_collapsed(split: Split, *, seed: int, epochs: int):
+    model = train_classifier(
+        split.train,
+        seed=seed,
+        epochs=epochs,
+        val_samples=split.val or None,
+    )
+    train_m = evaluate(model, split.train)
+    val_m = evaluate(model, split.val) if split.val else train_m
+    if not (is_collapsed(train_m) or is_collapsed(val_m)):
+        return model
+    return train_classifier(
+        split.train,
+        seed=seed,
+        epochs=max(epochs, 16),
+        val_samples=split.val or None,
+        class_weight_boost=2.5,
+        lr=0.05,
+    )
 
 
 def _split_is_grouped(split: Split) -> bool:
@@ -138,19 +191,26 @@ def write_model_card(
             shortfall = (
                 "Sensitivity meets the 0.85 report target on fixture bars. "
                 "This cloud run had no KAGGLE_CONFIG_DIR, so weights are fixture-trained, "
-                "not in-domain Kaggle. Specificity can stay low on this tiny set. "
-                "Re-run with credentials for real in-domain numbers. Not a clinical claim."
+                "not in-domain Kaggle. Re-run `python scripts/train_fall_cls.py --kaggle` "
+                "with credentials for real in-domain and cross-dataset numbers. Not a clinical claim."
             )
         else:
+            extra = ""
+            if test.specificity < 0.25:
+                extra = (
+                    " Specificity is still low. Cause: class-weighted CPU CNN on a small "
+                    "frame set; 0.85 sensitivity is the report target, not a spec floor."
+                )
             shortfall = (
                 "Sensitivity meets the 0.85 report target on the split named above. "
                 "That figure is a target, not a clinical claim."
+                + extra
             )
     if cross is None:
         cross_block = (
             "Cross-dataset eval (`uttejkumarkandagatla/fall-detection-dataset`) was not run. "
-            "The set stays eval-only until `datasets/LICENSES.md` quotes a commercial-training grant. "
-            "When the bytes are local: `python scripts/train_fall_cls.py eval --role eval`."
+            "The set stays eval-only (not in the training mix). "
+            "`--kaggle` downloads it when KAGGLE_CONFIG_DIR is set."
         )
     else:
         tn, fp, fn, tp = cross.confusion
@@ -178,6 +238,7 @@ versioned artifact for later sibling consume PRs. Not a diagnosis.
 - Input: `images` float32 NCHW, 3x32x32, BGR resize then /255
 - Output: `scores` softmax `[no_fall, fall]`
 - Stack: numpy-trained depthwise-separable CNN, ONNX opset 13, Apache-2.0 (OpenCV DNN)
+- Train: balanced mini-batches, inverse-frequency class weights, val threshold baked into fall logit
 - Default train code does not import Ultralytics or any AGPL package
 
 ## Data

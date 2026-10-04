@@ -23,6 +23,7 @@ class TrainedModel:
     fc_b: np.ndarray
     size: int = 32
     class_names: tuple[str, ...] = ("no_fall", "fall")
+    decision_threshold: float = 0.5
 
 
 @dataclass(frozen=True)
@@ -126,13 +127,128 @@ def _load_batch(samples: Sequence[Sample], size: int) -> tuple[np.ndarray, np.nd
     return np.stack(xs).astype(np.float32), np.asarray(ys, dtype=np.int64)
 
 
+def is_collapsed(metrics: Metrics) -> bool:
+    """True when both classes exist in labels but the model predicts only one class."""
+    if metrics.n < 2:
+        return False
+    tn, fp, fn, tp = metrics.confusion
+    if (tn + fp) == 0 or (tp + fn) == 0:
+        return False
+    if (tn + fn) == 0 or (tp + fp) == 0:
+        return True
+    return metrics.specificity == 0.0 or metrics.sensitivity == 0.0
+
+
+def _class_weights(y: np.ndarray, *, boost: float = 1.0) -> np.ndarray:
+    counts = np.bincount(y, minlength=2).astype(np.float32)
+    weights = y.size / (2.0 * np.maximum(counts, 1.0))
+    weights[0] *= float(boost)
+    return weights
+
+
+def _balanced_batch_indices(y: np.ndarray, batch_size: int, rng: np.random.Generator) -> np.ndarray:
+    i0 = np.where(y == 0)[0]
+    i1 = np.where(y == 1)[0]
+    if len(i0) == 0 or len(i1) == 0:
+        return rng.permutation(len(y))[: max(1, min(batch_size, len(y)))]
+    half = max(batch_size // 2, 1)
+    chosen0 = rng.choice(i0, size=half, replace=len(i0) < half)
+    chosen1 = rng.choice(i1, size=half, replace=len(i1) < half)
+    idx = np.concatenate([chosen0, chosen1])
+    rng.shuffle(idx)
+    return idx
+
+
+def _best_threshold(prob_fall: np.ndarray, y: np.ndarray) -> float:
+    """Pick P(fall) cutoff that keeps both classes and maximizes sens+spec."""
+    candidates = np.unique(np.concatenate(([0.05, 0.5, 0.95], prob_fall)))
+    best_tau = 0.5
+    best_score = -1.0
+    fallback_tau = 0.5
+    fallback_score = -1.0
+    for tau in candidates:
+        pred = (prob_fall >= float(tau)).astype(np.int64)
+        tn = int(((y == 0) & (pred == 0)).sum())
+        fp = int(((y == 0) & (pred == 1)).sum())
+        fn = int(((y == 1) & (pred == 0)).sum())
+        tp = int(((y == 1) & (pred == 1)).sum())
+        sens = (tp / (tp + fn)) if (tp + fn) else 0.0
+        spec = (tn / (tn + fp)) if (tn + fp) else 0.0
+        score = sens + spec
+        if spec > 0.0 and sens > 0.0 and score > best_score:
+            best_score = score
+            best_tau = float(tau)
+        if score > fallback_score:
+            fallback_score = score
+            fallback_tau = float(tau)
+    return best_tau if best_score >= 0.0 else fallback_tau
+
+
+def _bake_threshold(model: TrainedModel, tau: float) -> None:
+    """Shift fall logit so OpenCV argmax matches P(fall) >= tau."""
+    tau = min(max(float(tau), 1e-4), 1.0 - 1e-4)
+    model.fc_b = np.asarray(model.fc_b, dtype=np.float32).copy()
+    model.fc_b[1] = model.fc_b[1] + np.log((1.0 - tau) / tau)
+    model.decision_threshold = tau
+
+
+def _sgd_step(model: TrainedModel, xb: np.ndarray, yb: np.ndarray, weights: np.ndarray, lr: float) -> None:
+    logits, cache = _forward(xb, model, cache=True)
+    probs = _softmax(logits)
+    onehot = np.zeros_like(probs)
+    onehot[np.arange(len(yb)), yb] = 1.0
+    sample_w = weights[yb]
+    dlogits = (sample_w[:, None] * (probs - onehot)) / float(sample_w.sum())
+    dgap = dlogits @ model.fc_w
+    dfc_w = dlogits.T @ cache["gap"]
+    dfc_b = dlogits.sum(axis=0)
+    n_, c_, h_, w_ = cache["r2"].shape
+    dr2 = np.broadcast_to((dgap / (h_ * w_))[:, :, None, None], cache["r2"].shape).copy()
+    dpw = dr2 * (cache["r2"] > 0)
+    dpw_w = np.einsum("nohw,nihw->oi", dpw, cache["dw"], optimize=True).reshape(16, 8, 1, 1)
+    dpw_b = dpw.sum(axis=(0, 2, 3))
+    ddw = np.einsum("nohw,oi->nihw", dpw, model.pw_w[:, :, 0, 0], optimize=True)
+    pad = 1
+    p1p = np.pad(cache["p1"], ((0, 0), (0, 0), (pad, pad), (pad, pad)))
+    ddw_w = np.zeros_like(model.dw_w)
+    ddw_b = ddw.sum(axis=(0, 2, 3))
+    dp1 = np.zeros_like(cache["p1"])
+    for ch in range(8):
+        for i in range(3):
+            for j in range(3):
+                patch = p1p[:, ch, i : i + h_, j : j + w_]
+                ddw_w[ch, 0, i, j] = float((patch * ddw[:, ch]).sum())
+                dp1[:, ch] += ddw[:, ch] * float(model.dw_w[ch, 0, i, j])
+    dr1 = _unpool2(dp1, cache["idx1"])
+    dc1 = dr1 * (cache["r1"] > 0)
+    h1, w1 = dc1.shape[2], dc1.shape[3]
+    xp = np.pad(cache["x"], ((0, 0), (0, 0), (1, 1), (1, 1)))
+    dc1_w = np.zeros_like(model.conv1_w)
+    for i in range(3):
+        for j in range(3):
+            patch = xp[:, :, i : i + h1, j : j + w1]
+            dc1_w[:, :, i, j] = np.einsum("nohw,nchw->oc", dc1, patch, optimize=True)
+    dc1_b = dc1.sum(axis=(0, 2, 3))
+    model.fc_w -= lr * dfc_w.astype(np.float32)
+    model.fc_b -= lr * dfc_b.astype(np.float32)
+    model.pw_w -= lr * dpw_w.astype(np.float32)
+    model.pw_b -= lr * dpw_b.astype(np.float32)
+    model.dw_w -= lr * ddw_w.astype(np.float32)
+    model.dw_b -= lr * ddw_b.astype(np.float32)
+    model.conv1_w -= lr * dc1_w.astype(np.float32)
+    model.conv1_b -= lr * dc1_b.astype(np.float32)
+
+
 def train_classifier(
     samples: Sequence[Sample],
     *,
     seed: int = 47,
     epochs: int = 12,
-    lr: float = 0.12,
+    lr: float = 0.08,
     size: int = 32,
+    batch_size: int = 16,
+    val_samples: Sequence[Sample] | None = None,
+    class_weight_boost: float = 1.0,
 ) -> TrainedModel:
     if len(samples) < 4:
         raise ValueError("need at least 4 labeled frames to train")
@@ -149,55 +265,19 @@ def train_classifier(
         size=size,
     )
     x, y = _load_batch(samples, size)
-    n = len(samples)
+    if int((y == 0).sum()) == 0 or int((y == 1).sum()) == 0:
+        raise ValueError("need both fall and no_fall frames to train")
+    weights = _class_weights(y, boost=class_weight_boost)
+    steps = max(1, int(np.ceil(len(samples) / max(batch_size, 2))))
     for _ in range(epochs):
-        order = rng.permutation(n)
-        xb, yb = x[order], y[order]
-        logits, cache = _forward(xb, model, cache=True)
-        probs = _softmax(logits)
-        onehot = np.zeros_like(probs)
-        onehot[np.arange(n), yb] = 1.0
-        dlogits = (probs - onehot) / n
-        dgap = dlogits @ model.fc_w
-        dfc_w = dlogits.T @ cache["gap"]
-        dfc_b = dlogits.sum(axis=0)
-        n_, c_, h_, w_ = cache["r2"].shape
-        dr2 = np.broadcast_to((dgap / (h_ * w_))[:, :, None, None], cache["r2"].shape).copy()
-        dpw = dr2 * (cache["r2"] > 0)
-        # pointwise 1x1 conv backward
-        dpw_w = np.einsum("nohw,nihw->oi", dpw, cache["dw"], optimize=True).reshape(16, 8, 1, 1)
-        dpw_b = dpw.sum(axis=(0, 2, 3))
-        ddw = np.einsum("nohw,oi->nihw", dpw, model.pw_w[:, :, 0, 0], optimize=True)
-        # depthwise conv backward (pad 1)
-        pad = 1
-        p1p = np.pad(cache["p1"], ((0, 0), (0, 0), (pad, pad), (pad, pad)))
-        ddw_w = np.zeros_like(model.dw_w)
-        ddw_b = ddw.sum(axis=(0, 2, 3))
-        dp1 = np.zeros_like(cache["p1"])
-        for ch in range(8):
-            for i in range(3):
-                for j in range(3):
-                    patch = p1p[:, ch, i : i + h_, j : j + w_]
-                    ddw_w[ch, 0, i, j] = float((patch * ddw[:, ch]).sum())
-                    dp1[:, ch] += ddw[:, ch] * float(model.dw_w[ch, 0, i, j])
-        dr1 = _unpool2(dp1, cache["idx1"])
-        dc1 = dr1 * (cache["r1"] > 0)
-        h1, w1 = dc1.shape[2], dc1.shape[3]
-        xp = np.pad(cache["x"], ((0, 0), (0, 0), (1, 1), (1, 1)))
-        dc1_w = np.zeros_like(model.conv1_w)
-        for i in range(3):
-            for j in range(3):
-                patch = xp[:, :, i : i + h1, j : j + w1]
-                dc1_w[:, :, i, j] = np.einsum("nohw,nchw->oc", dc1, patch, optimize=True)
-        dc1_b = dc1.sum(axis=(0, 2, 3))
-        model.fc_w -= lr * dfc_w.astype(np.float32)
-        model.fc_b -= lr * dfc_b.astype(np.float32)
-        model.pw_w -= lr * dpw_w.astype(np.float32)
-        model.pw_b -= lr * dpw_b.astype(np.float32)
-        model.dw_w -= lr * ddw_w.astype(np.float32)
-        model.dw_b -= lr * ddw_b.astype(np.float32)
-        model.conv1_w -= lr * dc1_w.astype(np.float32)
-        model.conv1_b -= lr * dc1_b.astype(np.float32)
+        for _step in range(steps):
+            idx = _balanced_batch_indices(y, batch_size, rng)
+            _sgd_step(model, x[idx], y[idx], weights, lr)
+    cal_x, cal_y = (x, y)
+    if val_samples:
+        cal_x, cal_y = _load_batch(val_samples, size)
+    tau = _best_threshold(_softmax(_forward(cal_x, model))[:, 1], cal_y)
+    _bake_threshold(model, tau)
     return model
 
 

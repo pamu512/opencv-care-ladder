@@ -204,10 +204,10 @@ python scripts/train_fall_cls.py --kaggle
 ```
 
 `--kaggle` downloads the license-gated train slug (or the next permissive hit
-on the same search page), does a seeded grouped 70/15/15 split, trains, exports
-ONNX, and rewrites the model card including in-domain sensitivity (0.85 is a
-report target, not a ship gate) plus cross-dataset numbers when the eval set
-is present.
+on the same search page) and the eval-only set, does a seeded grouped 70/15/15
+split, trains with class weights plus balanced batches and a val threshold,
+exports ONNX, and rewrites the model card. 0.85 sensitivity is a report target,
+not a ship gate. A run that predicts only one class is refused.
 
 OpenCV DNN loads the ONNX (`cv2.dnn.readNetFromONNX`). Apache-2.0 stack only;
 Ultralytics is not a default extra.

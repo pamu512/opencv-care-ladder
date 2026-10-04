@@ -36,7 +36,12 @@ from care_ladder.fall_cls.licenses import (  # noqa: E402
     require_kaggle_config_dir,
 )
 from care_ladder.fall_cls.model import load_opencv_net  # noqa: E402
-from care_ladder.fall_cls.pipeline import refresh_manifest_file_hashes, run_fixture_train, run_kaggle_train  # noqa: E402
+from care_ladder.fall_cls.pipeline import (  # noqa: E402
+    prepare_kaggle_roots,
+    refresh_manifest_file_hashes,
+    run_fixture_train,
+    run_kaggle_train,
+)
 
 
 def _slug_dest(repo: Path, slug: str) -> Path:
@@ -122,10 +127,7 @@ def cmd_train(fixture: bool) -> int:
         result = run_fixture_train(repo=ROOT)
     else:
         require_kaggle_config_dir()
-        dest = _slug_dest(ROOT, TRAIN_SLUG)
-        if not dest.exists() or not any(dest.rglob("*")):
-            cmd_download("train")
-        eval_dest = _slug_dest(ROOT, EVAL_SLUG)
+        dest, eval_dest = prepare_kaggle_roots(ROOT, downloader=cmd_download)
         result = run_kaggle_train(dest, repo=ROOT, eval_root=eval_dest if eval_dest.exists() else None)
     print(json.dumps({k: (v.__dict__ if hasattr(v, "__dict__") else v) for k, v in result.items()}, indent=2, default=str))
     return 0

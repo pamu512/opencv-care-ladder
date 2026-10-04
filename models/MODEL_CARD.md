@@ -6,10 +6,11 @@ versioned artifact for later sibling consume PRs. Not a diagnosis.
 ## Artifact
 
 - File: `models/fall_cls_v1.onnx`
-- SHA256: `4d1a31122ff62d1c9214b0b139fb767430ca69d0b7e441c5e620e48e4f26687a`
+- SHA256: `3c37eb7c899846bdf01d1d56bd38629862c5e253c606c1d72a896cd851c8989b`
 - Input: `images` float32 NCHW, 3x32x32, BGR resize then /255
 - Output: `scores` softmax `[no_fall, fall]`
 - Stack: numpy-trained depthwise-separable CNN, ONNX opset 13, Apache-2.0 (OpenCV DNN)
+- Train: balanced mini-batches, inverse-frequency class weights, val threshold baked into fall logit
 - Default train code does not import Ultralytics or any AGPL package
 
 ## Data
@@ -30,15 +31,15 @@ Target fall sensitivity: 0.85 (report target, not a hard ship gate).
 
 | split | n | sensitivity | specificity | accuracy | confusion |
 | --- | --- | --- | --- | --- | --- |
-| train | 16 | 1.000 | 0.375 | 0.688 | tn=3 fp=5 fn=0 tp=8 |
-| val | 8 | 1.000 | 0.750 | 0.875 | tn=3 fp=1 fn=0 tp=4 |
-| test | 8 | 1.000 | 0.500 | 0.750 | tn=2 fp=2 fn=0 tp=4 |
+| train | 16 | 1.000 | 1.000 | 1.000 | tn=8 fp=0 fn=0 tp=8 |
+| val | 8 | 0.750 | 1.000 | 0.875 | tn=4 fp=0 fn=1 tp=3 |
+| test | 8 | 1.000 | 1.000 | 1.000 | tn=4 fp=0 fn=0 tp=4 |
 
-Sensitivity meets the 0.85 report target on fixture bars. This cloud run had no KAGGLE_CONFIG_DIR, so weights are fixture-trained, not in-domain Kaggle. Specificity can stay low on this tiny set. Re-run with credentials for real in-domain numbers. Not a clinical claim.
+Sensitivity meets the 0.85 report target on fixture bars. This cloud run had no KAGGLE_CONFIG_DIR, so weights are fixture-trained, not in-domain Kaggle. Re-run `python scripts/train_fall_cls.py --kaggle` with credentials for real in-domain and cross-dataset numbers. Not a clinical claim.
 
 ## Cross-dataset
 
-Cross-dataset eval (`uttejkumarkandagatla/fall-detection-dataset`) was not run. The set stays eval-only until `datasets/LICENSES.md` quotes a commercial-training grant. When the bytes are local: `python scripts/train_fall_cls.py eval --role eval`.
+Cross-dataset eval (`uttejkumarkandagatla/fall-detection-dataset`) was not run. The set stays eval-only (not in the training mix). `--kaggle` downloads it when KAGGLE_CONFIG_DIR is set.
 
 ## License
 

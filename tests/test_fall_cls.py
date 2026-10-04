@@ -285,6 +285,66 @@ def test_shipped_onnx_loads_under_opencv_and_optional_ort():
     assert out.shape[-1] == 2
 
 
+def test_imbalanced_train_is_not_always_one_class(tmp_path):
+    """Regression for the Mac Kaggle run: unweighted CE collapsed to always-fall (spec=0)."""
+    from care_ladder.fall_cls.model import evaluate, is_collapsed, train_classifier
+
+    all_fx = write_fixture_tree(tmp_path, n_per_class=24, seed=3)
+    samples = [s for s in all_fx if s.label == 1] + [s for s in all_fx if s.label == 0][:8]
+    assert sum(s.label == 1 for s in samples) == 24
+    assert sum(s.label == 0 for s in samples) == 8
+    model = train_classifier(samples, seed=47, epochs=12, size=32)
+    metrics = evaluate(model, samples)
+    assert not is_collapsed(metrics), metrics
+    assert metrics.specificity > 0.0
+    assert metrics.sensitivity > 0.0
+    tn, fp, fn, tp = metrics.confusion
+    assert tn + fn > 0  # predicted no_fall at least once
+    assert tp + fp > 0  # predicted fall at least once
+
+
+def test_yolo_txt_labels_when_folders_have_no_class_name(tmp_path):
+    import cv2
+
+    img_dir = tmp_path / "images" / "train"
+    lab_dir = tmp_path / "labels" / "train"
+    img_dir.mkdir(parents=True)
+    lab_dir.mkdir(parents=True)
+    (tmp_path / "data.yaml").write_text("names: [Fall Detected, Walking, Sitting]\n")
+    blank = np.zeros((16, 16, 3), dtype=np.uint8)
+    cv2.imwrite(str(img_dir / "a.jpg"), blank)
+    cv2.imwrite(str(img_dir / "b.jpg"), blank)
+    (lab_dir / "a.txt").write_text("0 0.5 0.5 0.2 0.2\n")
+    (lab_dir / "b.txt").write_text("1 0.5 0.5 0.2 0.2\n")
+    indexed = index_image_dir(tmp_path)
+    by_name = {s.path.name: s.label for s in indexed}
+    assert by_name["a.jpg"] == 1
+    assert by_name["b.jpg"] == 0
+
+
+def test_kaggle_path_fetches_eval_set_when_config_present(tmp_path, monkeypatch):
+    from care_ladder.fall_cls.pipeline import prepare_kaggle_roots
+
+    called: list[str] = []
+
+    def fake_dl(role: str) -> int:
+        dest = tmp_path / "datasets" / (
+            "elwalyahmad-fall-detection" if role == "train" else "uttejkumarkandagatla-fall-detection-dataset"
+        )
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / f"{role}.ok").write_text("1")
+        called.append(role)
+        return 0
+
+    monkeypatch.setenv("KAGGLE_CONFIG_DIR", str(tmp_path / "kcfg"))
+    (tmp_path / "kcfg").mkdir()
+    (tmp_path / "kcfg" / "kaggle.json").write_text("{}")
+    train_root, eval_root = prepare_kaggle_roots(tmp_path, downloader=fake_dl)
+    assert called == ["train", "eval"]
+    assert train_root.exists()
+    assert eval_root.exists()
+
+
 def test_sha256_tree_is_stable(tmp_path):
     (tmp_path / "a.bin").write_bytes(b"abc")
     (tmp_path / "sub").mkdir()
