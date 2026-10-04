@@ -166,6 +166,52 @@ See `configs/demo_home.yaml`. Emergency rung is **disabled by default** (fail-cl
 
 E2E demo path: `tests/test_e2e_demo.py` (fixture → incident has ≥3 audit events).
 
+## Fall classifier train (Kaggle, this repo only)
+
+This repo owns `models/fall_cls_v1.onnx`. Sibling CareLadder repos consume the
+artifact later. There is no second trainer.
+
+Datasets stay on the Kaggle `fall` + Computer Vision search. Train slug is
+`elwalyahmad/fall-detection` after a live license check (CC0 on the 2026-10-04
+view API; Autoclaw had noted CC BY 4.0 on-card; both are commercial-permissive).
+`uttejkumarkandagatla/fall-detection-dataset` is eval-only until
+`datasets/LICENSES.md` quotes a commercial grant. `simuletic/...` (NC-SA) and
+`soumicksarker/...` (Other) stay out.
+
+`datasets/` bytes are gitignored. `datasets/LICENSES.md` and
+`datasets/manifest.json` (pinned version + metadata sha256) are tracked.
+
+### CI / no credentials (default)
+
+```bash
+pip install -e ".[dev,train]"   # train extra is onnx + kaggle CLI; onnx needed to export
+python scripts/train_fall_cls.py --fixture
+.venv/bin/pytest tests/test_fall_cls.py -v
+```
+
+`--fixture` trains the same tiny depthwise CNN on synthetic bars under
+`tests/fixtures/fall_cls/`, writes `models/fall_cls_v1.onnx` and
+`models/MODEL_CARD.md`. Unit tests mock Kaggle and never download the full set.
+
+### Full Kaggle train (machine with credentials)
+
+```bash
+# kaggle.json lives in this directory. Do not copy it into the repo.
+export KAGGLE_CONFIG_DIR=$HOME/.kaggle
+pip install -e ".[train]"
+python scripts/train_fall_cls.py verify-licenses
+python scripts/train_fall_cls.py --kaggle
+```
+
+`--kaggle` downloads the license-gated train slug (or the next permissive hit
+on the same search page) and the eval-only set, does a seeded grouped 70/15/15
+split, trains with class weights plus balanced batches and a val threshold,
+exports ONNX, and rewrites the model card. 0.85 sensitivity is a report target,
+not a ship gate. A run that predicts only one class is refused.
+
+OpenCV DNN loads the ONNX (`cv2.dnn.readNetFromONNX`). Apache-2.0 stack only;
+Ultralytics is not a default extra.
+
 ## AWS deployment (live)
 
 **Live demo (verified):** https://d2u7pls4da2poz.cloudfront.net/ui/ - CloudFront HTTPS -> ALB -> ECS Fargate (X86_64), DynamoDB incident store, S3 silhouette clips, EventBridge cue bus with a CloudWatch archive rule. CI on every push runs the test suite + real-footage evaluation, builds the amd64 image, pushes to ECR, re-registers the task definition, and rolls the service - a push to `main` is a verified deploy (`scripts/infra.sh` replays the provisioning). Local run via `./scripts/run_demo.sh` needs no AWS credentials.

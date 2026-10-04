@@ -1,4 +1,5 @@
 models/*.onnx
+!models/fall_cls_v1.onnx
 .DS_Store
 .venv/
 __pycache__/
@@ -6,3 +7,10 @@ __pycache__/
 clips/*.avi
 clips/meta
 data/
+kaggle.json
+**/kaggle.json
+# Dataset bytes stay local. License notes and the pin manifest are tracked.
+datasets/*
+!datasets/LICENSES.md
+!datasets/manifest.json
+tests/fixtures/fall_cls/

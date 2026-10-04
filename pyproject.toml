@@ -24,6 +24,12 @@ dependencies = [
 dev = [
   "pytest",
   "httpx2>=2.0.0",
+  "onnx>=1.16",
+]
+train = [
+  "kaggle>=1.6",
+  "onnx>=1.16",
+  "onnxruntime>=1.18",
 ]
 
 [tool.setuptools.packages.find]
