@@ -1,0 +1,47 @@
+{
+  "eval": {
+    "files_sha256": null,
+    "has_computer_vision_tag": false,
+    "kaggle_id": 1772453,
+    "last_updated": "2021-12-06T13:01:26.737Z",
+    "license": "Database: Open Database, Contents: Original Authors",
+    "metadata_sha256": "d2b619ea5242e0b54f85e5c6794c2a61eaf05c28ccd24630e792bc87a3437820",
+    "role": "eval-only",
+    "slug": "uttejkumarkandagatla/fall-detection-dataset",
+    "total_bytes": 52577932,
+    "version": 1
+  },
+  "excluded": [
+    {
+      "license": "CC BY-NC-SA 4.0",
+      "reason": "non-commercial ShareAlike",
+      "slug": "simuletic/cctv-incident-dataset-fall-and-lying-down-detection"
+    },
+    {
+      "license": "Other (specified in description)",
+      "reason": "unverified Other; no commercial grant on file",
+      "slug": "soumicksarker/multiple-cameras-fall-dataset"
+    }
+  ],
+  "fallbacks_if_primary_not_permissive": [
+    "payutch/fall-video-dataset",
+    "antonygarciag/walker-fall-detection"
+  ],
+  "family": "kaggle-fall-computer-vision",
+  "search": "https://www.kaggle.com/datasets?search=fall&tags=13207-Computer+Vision",
+  "train": {
+    "files_sha256": null,
+    "files_sha256_note": "Filled by scripts/train_fall_cls.py download when KAGGLE_CONFIG_DIR is set. Dataset bytes are gitignored.",
+    "has_computer_vision_tag": true,
+    "kaggle_id": 3755247,
+    "last_updated": "2023-09-19T05:29:47.69Z",
+    "license": "CC0: Public Domain",
+    "license_note": "Kaggle view API 2026-10-04. Autoclaw 2026-10-02 noted CC BY 4.0 on-card; both are commercial-permissive. Live gate re-checks licenseName at download.",
+    "metadata_sha256": "ffd126d14732e48435cc3d89c600a1e0cbcb3fabfd738cecc54e3ac9c34e0deb",
+    "role": "train",
+    "slug": "elwalyahmad/fall-detection",
+    "total_bytes": 47033585,
+    "version": 1
+  },
+  "verified_at": "2026-10-04"
+}

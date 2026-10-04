@@ -1,0 +1,17 @@
+# Edge fall classifier. Apache-2.0 stack only. No Ultralytics.
+seed: 47
+split: [0.70, 0.15, 0.15]
+input_size: 32
+epochs_fixture: 12
+epochs_kaggle: 20
+lr: 0.12
+classes: [no_fall, fall]
+search: https://www.kaggle.com/datasets?search=fall&tags=13207-Computer+Vision
+train_slug: elwalyahmad/fall-detection
+eval_slug: uttejkumarkandagatla/fall-detection-dataset
+excluded:
+  - simuletic/cctv-incident-dataset-fall-and-lying-down-detection
+  - soumicksarker/multiple-cameras-fall-dataset
+fallbacks_if_primary_not_permissive:
+  - payutch/fall-video-dataset
+  - antonygarciag/walker-fall-detection
