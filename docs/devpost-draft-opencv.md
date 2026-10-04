@@ -1,12 +1,12 @@
 # Devpost field draft - Care Ladder (OpenCV AI Competition 2026)
 
-**Status:** Paste-ready filing note for Anoop. OpenCV track only. Not an Amazon / Alexa+ Fire TV submission.
+**Status:** Draft only. Paste-ready filing notes for Anoop. Do not Final Submit without Anoop. OpenCV track only. Not an Amazon / Alexa+ Fire TV submission.
 **Competition:** https://opencv26.devpost.com/
 **Draft already started:** https://devpost.com/submit-to/30984-opencv-ai-competition-2026-powered-by-aws/manage/submissions/1199879-care-ladder-vision/edit
 **Deadline:** Oct 26, 2026 @ 11:45pm PDT
 **Team (proposal):** NOTATEAM · member Anoop Pamu / pamu512
-**Repo tip at draft time:** main ~00a5e95 (adaptive schedule learning landed, CI green)
-**Do not invent grant award status.** Compute grant selection is separate from this final package.
+**Repo tip at draft time:** main @ 175b370 (PR #15 Telegram-proven VO) after PR #14 a7357c0 (`fall_cls_v1.onnx`).
+**Do not invent grant award status.** AWS compute grant selection is unknown. Do not claim selected.
 
 No ML hype. No clinical claims. No live 911. Demo/simulator stack.
 
@@ -44,25 +44,27 @@ Additional Agentic Vision evidence:
 
 ---
 
-## Asset inventory vs gaps (as of 2026-09-27 HKT)
+## Asset inventory vs gaps (as of 2026-10-04)
 
 | Asset | Status | Pointer |
 | --- | --- | --- |
 | Technical report | Ready | `docs/technical-report.md` |
 | Code repo + pinned deps + CI | Ready | https://github.com/pamu512/opencv-care-ladder · `requirements-lock.txt` · `pyproject.toml` · GitHub Actions CI |
 | Live web endpoint | Ready | https://d2u7pls4da2poz.cloudfront.net/ui/ |
+| GitHub Pages landing | Ready | https://pamu512.github.io/opencv-care-ladder/ |
 | Agent workflow diagram | Ready (HTML) | `docs/agentic-workflow.html` (screen-capture for gallery) |
 | AWS architecture prose | Ready | `infra/README.md` · `infra/ecs-task-outline.md` · `infra/task-definition.json` |
 | Eval + failure modes | Ready | `docs/eval-metrics.json` · `docs/failure-modes.md` |
-| Demo / video scripts | Ready | `docs/demo-script.md` · `docs/demo-video-script.md` |
-| Local mp4 in repo | Present, 300.0s (= 5:00 hard cap) | `docs/demo/care-ladder-demo.mp4` (~4.6 MB) |
-| YouTube / Vimeo public or unlisted link | **GAP** | Devpost embeds YouTube/Vimeo only; upload still needed |
+| Demo / video scripts | Ready | `docs/demo-script.md` · `docs/demo-video-script.md` @ 175b370 |
+| Canonical local mp4 (Desktop) | Ready, ~184.7s (~3:05), 1280x720 | Desktop `care-ladder-demo-chatterbox-telegram.mp4`. SHA-256 `fb6037b8e6f29411a816fd2ffb92c34946ef0fb3548a9ad502f6c49e1af7c874`. Canonical for Devpost until a follow-up PR replaces `docs/demo`. Structure: Path A → Path B Family chat mirror + ack → DNN/privacy → pre-seeded KU Leuven fall (privacy-blurred frame is intentional) → close. |
+| Repo mp4 on main | Stale 5:00 placeholder | `docs/demo/care-ladder-demo.mp4` (~4.6 MB, 300s). Not the Devpost cut. |
+| YouTube / Vimeo public or unlisted link | **GAP** | YouTube (unlisted): TBD |
 | Gallery thumbnail (JPG/PNG/GIF, ~3:2) | **GAP** | Capture from `/ui/` or diagram |
 | Static PNG architecture for gallery | Soft gap | HTML diagram exists; export PNG/SVG screenshot recommended |
 | Agentic-workflow HTML accuracy | Soft gap | Diagram text says "Fargate · Graviton ARM64"; live demo is **ECS Fargate X86_64**. Fix before gallery shot or caption "design preference; live tip is X86_64" |
-| This Devpost draft on main | Was only on closed `ide/adaptive-schedule-learning-c860` | Expanded file to land on main via PR / CloudAgent |
+| This Devpost draft | Refresh on this PR | Recovered from 9f8e982 / later Telegram edits; updated for the 2026-10-04 Telegram-proven judge cut |
 | COOL Award extras | N/A | Not pursuing COOL |
-| Grant award claim | Do not invent | Proposal submitted under NOTATEAM; do not claim selected unless confirmed |
+| Grant award claim | Unknown | Proposal submitted under NOTATEAM. Do not claim an AWS compute grant unless Anoop confirms selection. |
 
 ---
 
@@ -115,6 +117,7 @@ Do **not** tag Alexa / Fire TV / Amazon Developer Hackathon tooling here. OpenCV
 | Label | URL |
 | --- | --- |
 | Live demo (caregiver console) | https://d2u7pls4da2poz.cloudfront.net/ui/ |
+| GitHub Pages landing | https://pamu512.github.io/opencv-care-ladder/ |
 | Source repository | https://github.com/pamu512/opencv-care-ladder |
 | Technical report | https://github.com/pamu512/opencv-care-ladder/blob/main/docs/technical-report.md |
 | Agent workflow diagram | https://github.com/pamu512/opencv-care-ladder/blob/main/docs/agentic-workflow.html |
@@ -123,7 +126,9 @@ Do **not** tag Alexa / Fire TV / Amazon Developer Hackathon tooling here. OpenCV
 | Eval metrics (JSON) | https://github.com/pamu512/opencv-care-ladder/blob/main/docs/eval-metrics.json |
 | Competition page | https://opencv26.devpost.com/ |
 
-Video link: **paste YouTube/Vimeo URL after upload** (repo mp4 alone will not embed).
+YouTube (unlisted): TBD
+
+Video link: paste the YouTube/Vimeo URL after upload (repo mp4 alone will not embed). Desktop cut is the canonical file until then.
 
 ### Project story (Markdown for Devpost description)
 
@@ -146,11 +151,11 @@ OpenCV 5 perception emits structured cues (`no_movement`, `no_visibility`, `came
 6. Dial secondary (stub)
 7. Emergency rung (**fail-closed** by default; even enabled, code audits only and never places a real 911 call)
 
-**Agentic Vision evidence:** the same stillness cue resolves with no dial on a `clear_ok` reply (Path A, including soft OK like "don't worry"), escalates on silence (Path B), and jumps to a human on `needs_human` (mixed hurt never invents OK). A covered camera is a different cue (`camera_occlusion`) and a different tool path: ask to clear the lens, inform the caretaker, never claim distress. Every jump is logged with `from_index` / `to_index` / `reason` on the caregiver timeline.
+**Agentic Vision evidence:** OpenCV cue → ladder → Telegram inform → family ack. The same stillness cue resolves with no dial on a `clear_ok` reply (Path A, including soft OK like "don't worry"), escalates on silence (Path B) to a BotThread / Telegram family chat mirror, and stands down on family or console ack. It jumps to a human on `needs_human` (mixed hurt never invents OK). A covered camera is a different cue (`camera_occlusion`) and a different tool path: ask to clear the lens, inform the caretaker, never claim distress. Every jump is logged with `from_index` / `to_index` / `reason` on the caregiver timeline.
 
 **Family Telegram (confirm-before-escalate, not the vision claim):** after speaker silence the family gets a BotThread inform card (inline 1|2|3 or reply `1`/`2`/`3`). Any family or console ack stops dial. OpenCV cues still choose the next tools; Telegram is the family page after the speaker, and without `TELEGRAM_BOT_TOKEN` the demo stays on an honest stub / chat mirror.
 
-Privacy is enforced at attach: blur or silhouette runs **before** any pre-event frame is stored or served. Raw identifiable video never leaves the device path.
+Privacy is enforced at attach: blur or silhouette runs **before** any pre-event frame is stored or served. Raw identifiable video never leaves the device path. Fall detection frames are intentionally privacy-blurred in the product and in the demo video stills.
 
 **Adaptive schedule learning (honest scope):** the ladder learns a household's usual day from closed-incident histograms (`RoutineProfile`: rapid, then settled after about ten confirmed-OK days, freezable) and adapts the stillness timeout with a timeline-visible explain line. This is schedule-baseline learning only. It is not a neural net, not a risk score, not clinical, and it never auto-enables the emergency rung or changes rung order.
 
@@ -208,7 +213,8 @@ Privacy is enforced at attach: blur or silhouette runs **before** any pre-event 
 ## Links for judges
 
 - Live demo: https://d2u7pls4da2poz.cloudfront.net/ui/
-- Repo: https://github.com/pamu512/opencv-care-ladder
+- Landing: https://pamu512.github.io/opencv-care-ladder/
+- Repo: https://github.com/pamu512/opencv-care-ladder/
 - Technical report: `docs/technical-report.md`
 - Agent diagram: `docs/agentic-workflow.html`
 - AWS sketch: `infra/README.md`
@@ -225,7 +231,7 @@ The ladder learns a household's usual day from audit histograms (rapid, then set
 
 ```
 Agentic Vision path: yes. COOL path: no.
-OpenCV 5 CueEvent output selects and steers ladder tools (reperceive, speaker_prompt, dial_contact, resolve/jump). Same cue, different actions by reply. Trace visible on /incidents/{id} and the /ui/ timeline.
+OpenCV 5 CueEvent output selects and steers ladder tools (reperceive, speaker_prompt, notify_caretaker / BotThread Telegram inform, dial_contact, resolve/jump). Same cue, different actions by reply (OpenCV cue → ladder → Telegram inform → family ack). Trace visible on /incidents/{id}, the /ui/ timeline, and the Family chat mirror.
 ```
 
 ### Team bio (if Additional Info asks)
@@ -253,11 +259,12 @@ Care Ladder agentic workflow: OpenCV 5 perception → YAML ladder decision → A
 
 ## Video checklist (human)
 
-1. Record or refresh using `docs/demo-video-script.md` (target 4:30–5:00; **hard max 5:00**).
-2. Existing repo file `docs/demo/care-ladder-demo.mp4` is exactly 300s. Confirm content matches current UI (adaptive learning badge) before upload; re-record if stale.
-3. Upload to **YouTube (unlisted)** or **Vimeo**; paste URL into Devpost Video field.
-4. Show: team intro, Path A, Path B, OpenCV/DNN or fall beat, architecture, principal eval numbers, responsible-use lines.
-5. Description attribution: KU Leuven fall clips; OpenCV Zoo models; OpenCV vtest.
+1. Canonical cut is Desktop `care-ladder-demo-chatterbox-telegram.mp4` (~184.7s / ~3:05, 1280x720, SHA-256 `fb6037b8e6f29411a816fd2ffb92c34946ef0fb3548a9ad502f6c49e1af7c874`). Script: `docs/demo-video-script.md` @ 175b370.
+2. Structure: Path A → Path B Family chat mirror + ack → DNN/privacy → pre-seeded KU Leuven fall (privacy-blurred frame is intentional) → close.
+3. Repo file `docs/demo/care-ladder-demo.mp4` may still be the old 5:00 placeholder on main. Do not upload that to Devpost. A follow-up PR should replace `docs/demo` with the new cut.
+4. YouTube (unlisted): TBD
+5. Upload to **YouTube (unlisted)** or **Vimeo**; paste URL into Devpost Video field. Repo or Desktop mp4 alone will not embed.
+6. Description attribution: KU Leuven fall clips; OpenCV Zoo models; OpenCV vtest.
 
 ---
 
@@ -268,8 +275,8 @@ Care Ladder agentic workflow: OpenCV 5 perception → YAML ladder decision → A
 3. Upload thumbnail + gallery shots (UI Path A/B, silhouette clip panel, architecture screenshot).
 4. Upload video to YouTube/Vimeo → paste link.
 5. Attach or link technical report / architecture (repo links are enough if form allows URL fields; zip/PDF only if Additional Info requires upload).
-6. Confirm Agentic Vision path; do **not** claim COOL; do **not** claim AWS compute grant unless officially selected.
-7. Agree to terms → **Submit** (editable until deadline; submit early for optional Devpost eligibility review).
+6. Confirm Agentic Vision path; do **not** claim COOL; do **not** claim AWS compute grant (status unknown unless Anoop confirms selection).
+7. Keep this as a **draft**. Final Submit only with Anoop. Do not click Final Submit from this note.
 8. Keep Amazon / Alexa+ Fire TV Devpost and Galuxium drafts separate. Do not paste this package there.
 
 ---
@@ -287,3 +294,4 @@ python scripts/evaluate.py --dnn --json docs/eval-metrics.json
 ```
 
 Live: https://d2u7pls4da2poz.cloudfront.net/ui/
+Landing: https://pamu512.github.io/opencv-care-ladder/
