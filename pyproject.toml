@@ -24,6 +24,7 @@ dependencies = [
 dev = [
   "pytest",
   "httpx2>=2.0.0",
+  "onnx>=1.16",
 ]
 train = [
   "kaggle>=1.6",
