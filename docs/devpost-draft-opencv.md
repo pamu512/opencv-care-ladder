@@ -1,6 +1,6 @@
 # Devpost field draft - Care Ladder (OpenCV AI Competition 2026)
 
-**Status:** Draft only. Paste-ready filing notes for Anoop. Do not Final Submit without Anoop. OpenCV track only. Not an Amazon / Alexa+ Fire TV submission.
+**Status:** Draft only. Paste-ready filing notes for Anoop. Do not Final Submit without Anoop. The Devpost draft already has the video and live demo saved. Still not Final Submitted. OpenCV track only. Not an Amazon / Alexa+ Fire TV submission.
 **Competition:** https://opencv26.devpost.com/
 **Draft already started:** https://devpost.com/submit-to/30984-opencv-ai-competition-2026-powered-by-aws/manage/submissions/1199879-care-ladder-vision/edit
 **Deadline:** Oct 26, 2026 @ 11:45pm PDT
@@ -58,7 +58,7 @@ Additional Agentic Vision evidence:
 | Demo / video scripts | Ready | `docs/demo-script.md` · `docs/demo-video-script.md` @ 175b370 |
 | Canonical local mp4 (Desktop) | Ready, ~184.7s (~3:05), 1280x720 | Desktop `care-ladder-demo-chatterbox-telegram.mp4`. SHA-256 `fb6037b8e6f29411a816fd2ffb92c34946ef0fb3548a9ad502f6c49e1af7c874`. Canonical for Devpost until a follow-up PR replaces `docs/demo`. Structure: Path A → Path B Family chat mirror + ack → DNN/privacy → pre-seeded KU Leuven fall (privacy-blurred frame is intentional) → close. |
 | Repo mp4 on main | Stale 5:00 placeholder | `docs/demo/care-ladder-demo.mp4` (~4.6 MB, 300s). Not the Devpost cut. |
-| YouTube / Vimeo public or unlisted link | **GAP** | YouTube (unlisted): TBD |
+| YouTube / Vimeo public or unlisted link | Ready (unlisted) | YouTube (unlisted): https://www.youtube.com/watch?v=LTECIQyNPJI |
 | Gallery thumbnail (JPG/PNG/GIF, ~3:2) | **GAP** | Capture from `/ui/` or diagram |
 | Static PNG architecture for gallery | Soft gap | HTML diagram exists; export PNG/SVG screenshot recommended |
 | Agentic-workflow HTML accuracy | Soft gap | Diagram text says "Fargate · Graviton ARM64"; live demo is **ECS Fargate X86_64**. Fix before gallery shot or caption "design preference; live tip is X86_64" |
@@ -117,6 +117,7 @@ Do **not** tag Alexa / Fire TV / Amazon Developer Hackathon tooling here. OpenCV
 | Label | URL |
 | --- | --- |
 | Live demo (caregiver console) | https://d2u7pls4da2poz.cloudfront.net/ui/ |
+| Project video (YouTube unlisted) | https://www.youtube.com/watch?v=LTECIQyNPJI |
 | GitHub Pages landing | https://pamu512.github.io/opencv-care-ladder/ |
 | Source repository | https://github.com/pamu512/opencv-care-ladder |
 | Technical report | https://github.com/pamu512/opencv-care-ladder/blob/main/docs/technical-report.md |
@@ -126,9 +127,9 @@ Do **not** tag Alexa / Fire TV / Amazon Developer Hackathon tooling here. OpenCV
 | Eval metrics (JSON) | https://github.com/pamu512/opencv-care-ladder/blob/main/docs/eval-metrics.json |
 | Competition page | https://opencv26.devpost.com/ |
 
-YouTube (unlisted): TBD
+YouTube (unlisted): https://www.youtube.com/watch?v=LTECIQyNPJI
 
-Video link: paste the YouTube/Vimeo URL after upload (repo mp4 alone will not embed). Desktop cut is the canonical file until then.
+Video link is already saved on the Devpost draft (still not Final Submitted). Desktop cut remains the local source of truth until a follow-up PR replaces `docs/demo`.
 
 ### Project story (Markdown for Devpost description)
 
@@ -213,6 +214,7 @@ Privacy is enforced at attach: blur or silhouette runs **before** any pre-event 
 ## Links for judges
 
 - Live demo: https://d2u7pls4da2poz.cloudfront.net/ui/
+- Video (YouTube unlisted): https://www.youtube.com/watch?v=LTECIQyNPJI
 - Landing: https://pamu512.github.io/opencv-care-ladder/
 - Repo: https://github.com/pamu512/opencv-care-ladder/
 - Technical report: `docs/technical-report.md`
@@ -262,8 +264,8 @@ Care Ladder agentic workflow: OpenCV 5 perception → YAML ladder decision → A
 1. Canonical cut is Desktop `care-ladder-demo-chatterbox-telegram.mp4` (~184.7s / ~3:05, 1280x720, SHA-256 `fb6037b8e6f29411a816fd2ffb92c34946ef0fb3548a9ad502f6c49e1af7c874`). Script: `docs/demo-video-script.md` @ 175b370.
 2. Structure: Path A → Path B Family chat mirror + ack → DNN/privacy → pre-seeded KU Leuven fall (privacy-blurred frame is intentional) → close.
 3. Repo file `docs/demo/care-ladder-demo.mp4` may still be the old 5:00 placeholder on main. Do not upload that to Devpost. A follow-up PR should replace `docs/demo` with the new cut.
-4. YouTube (unlisted): TBD
-5. Upload to **YouTube (unlisted)** or **Vimeo**; paste URL into Devpost Video field. Repo or Desktop mp4 alone will not embed.
+4. YouTube (unlisted): https://www.youtube.com/watch?v=LTECIQyNPJI
+5. Video is already saved on the Devpost draft. Do not re-upload the stale repo 5:00 placeholder.
 6. Description attribution: KU Leuven fall clips; OpenCV Zoo models; OpenCV vtest.
 
 ---
@@ -273,7 +275,7 @@ Care Ladder agentic workflow: OpenCV 5 perception → YAML ladder decision → A
 1. Open draft: https://devpost.com/submit-to/30984-opencv-ai-competition-2026-powered-by-aws/manage/submissions/1199879-care-ladder-vision/edit
 2. Paste name, tagline, story, Built with, Try-it-out links from this file.
 3. Upload thumbnail + gallery shots (UI Path A/B, silhouette clip panel, architecture screenshot).
-4. Upload video to YouTube/Vimeo → paste link.
+4. Video is already on the Devpost draft: https://www.youtube.com/watch?v=LTECIQyNPJI (unlisted). Live demo is already saved too. Do not Final Submit.
 5. Attach or link technical report / architecture (repo links are enough if form allows URL fields; zip/PDF only if Additional Info requires upload).
 6. Confirm Agentic Vision path; do **not** claim COOL; do **not** claim AWS compute grant (status unknown unless Anoop confirms selection).
 7. Keep this as a **draft**. Final Submit only with Anoop. Do not click Final Submit from this note.
