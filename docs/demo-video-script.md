@@ -1,8 +1,8 @@
 # OpenCV Care Ladder — judge demo VO (v3 cut / same VO as v2)
 
 **Cut:** v3 re-shoot after Alexa/Nest UI scrub (main `4111ff1` / PR #19). Same approved Chatterbox VO as v2.
-**Duration:** ~144.87s · 1280×720 · H.264 + AAC
-**SHA-256:** `be6574fa73aabea30307124e76cbd506e5fbfd8f163be61c512e2874a71068e0`
+**Duration:** ~144.80s · 1280×720 · H.264 + AAC
+**SHA-256:** `6d7ad24a9efe1ecf71d4d4193d46c11f4f8691e66fd38d333f1048deb28623cf`
 **Box path:** `/workspace/devpost-update/care-ladder-vision-v3.mp4`
 **Do not merge this PR to main as the sole gate for Devpost; Anoop holds Final Submit / YouTube.**
 
