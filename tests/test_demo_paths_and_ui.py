@@ -6,6 +6,39 @@ from care_ladder.api.app import create_app
 from care_ladder.audit.store import AuditStore
 
 
+def test_cold_start_seeds_distress_incident():
+    """Slice 4: an empty store pins the pre-seeded distress incident."""
+    app = create_app(store=AuditStore())
+    with TestClient(app) as client:
+        first = client.get("/incidents").json()
+    assert len(first) == 1
+    assert first[0]["cue"]["kind"] == "distress_heuristic"
+    assert first[0]["status"] in {"resolved", "exhausted"}
+    with TestClient(app) as client2:
+        second = client2.get("/incidents").json()
+    # seeding is once-only: a second app over a non-empty store adds nothing
+    assert len(second) == 1
+
+
+def test_opencv_distress_fixture_runs_shape_heuristic():
+    app = create_app(store=AuditStore())
+    with TestClient(app) as client:
+        # pre-seed makes the store non-empty; run the fixture explicitly
+        client.get("/incidents")
+        r = client.post("/demo/run", json={"fixture": "opencv_distress"})
+        assert r.status_code == 200, r.text
+        inc = client.get(f"/incidents/{r.json()['incident_id']}").json()
+    assert inc["cue"]["kind"] == "distress_heuristic"
+    assert inc["cue"]["detail"]["non_clinical"] is True
+    tools = [e["tool"] for e in inc["events"]]
+    assert "reperceive" in tools
+    assert "dial_contact" in tools  # silence path escalates
+    # reperceive re-observed the attached frames (detector was passed)
+    rep = next(e for e in inc["events"] if e["tool"] == "reperceive")
+    assert rep["detail"]["result"] == "reobserved"
+    assert rep["detail"]["confirmed_kind"] == "distress_heuristic"
+
+
 def _run(client: TestClient, fixture: str) -> dict:
     resp = client.post("/demo/run", json={"fixture": fixture})
     assert resp.status_code == 200, resp.text

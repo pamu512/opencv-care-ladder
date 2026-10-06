@@ -112,3 +112,38 @@ def test_from_plan_uses_timeout_and_zone():
     cue = det.observe(frame, t=2.5)
     assert cue is not None
     assert cue.kind == "no_movement"
+
+
+def test_reobserve_cold_detector_no_state_leak():
+    """reobserve starts from a cold detector: first-pass state must not leak.
+
+    A detector that already fired no_movement re-observing the same frames
+    must re-arm its own timers; identical output kinds with honest telemetry
+    (frames, window, detected) and no duplicate kinds.
+    """
+    det = CueDetector(no_movement_timeout_sec=2.0, zone=((0, 0), (160, 0), (160, 120), (0, 120)))
+    frame = _blank()
+    frame[40:80, 60:100] = 200
+    times = [0.0, 0.5, 1.0, 2.5]
+    first = None
+    for f, t in zip([frame] * 4, times):
+        first = det.observe(frame, t=t) or first
+    assert first is not None and first.kind == "no_movement"
+
+    events, telemetry = det.reobserve([frame] * 4, dt=1.0)
+    assert [e.kind for e in events] == ["no_movement"]
+    assert telemetry["frames"] == 4
+    assert telemetry["window_sec"] == 4.0
+    assert telemetry["detected"] == ["no_movement"]
+    assert telemetry["window_too_short"] is False
+
+
+def test_reobserve_empty_or_short_window_is_honest():
+    det = CueDetector(no_movement_timeout_sec=900.0, zone=((0, 0), (160, 0), (160, 120), (0, 120)))
+    frame = _blank()
+    frame[40:80, 60:100] = 200
+    events, telemetry = det.reobserve([frame, frame], dt=0.5)
+    # window shorter than the stillness timeout: nothing fires, and the
+    # telemetry must say the window was too short rather than implying fine
+    assert events == []
+    assert telemetry["window_too_short"] is True

@@ -1,7 +1,8 @@
 # MODEL_CARD fall_cls_v1
 
-Non-clinical edge classifier. OpenCV cues still drive the care ladder; this ONNX is a
-versioned artifact for later sibling consume PRs. Not a diagnosis.
+Non-clinical edge classifier, **not wired into the live `/ui/` decision path**: OpenCV
+cues (MediaPipe ONNX + heuristics in `CueDetector`) still drive the care ladder. This
+ONNX is a versioned artifact for later sibling consume PRs. Not a diagnosis.
 
 ## Artifact
 
