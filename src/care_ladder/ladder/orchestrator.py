@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from care_ladder.learning.profile import RoutineProfile
+    from care_ladder.vision.cues import CueDetector
 
 from care_ladder.channels.bot import BotRegistry, BotThread, InformCard
 from care_ladder.channels.dial import StubDialer, next_rung_after_no_answer
@@ -452,6 +453,7 @@ async def run_incident(
     routine_profile: "RoutineProfile | None" = None,
     *,
     store: AuditStore | None = None,
+    detector: "CueDetector | None" = None,
     max_wait_sec: float = 0.05,
     privacy_mode: PrivacyMode = "blur",
     now: datetime | None = None,
@@ -471,6 +473,13 @@ async def run_incident(
     - ``emergency`` with ``enabled`` not True → fail-closed skip (never real 911)
 
     Pre-event frames are privacy-transformed (default blur) before attach count.
+
+    ``detector`` (optional): the CueDetector that produced the cue. When both
+    the detector and pre-event frames are available, the ``reperceive`` rung
+    re-observes the buffered frames through a cold copy of the detector and
+    logs a second CueEvent per cue kind that re-fires. Without it the rung is
+    honestly labeled ``stub_ok`` / ``no_frames_buffered`` instead of claiming
+    a re-check that did not happen.
     """
     # Adaptive schedule learning (spec 2026-09-27): resolve effective stillness
     # timeout from the household's RoutineProfile BEFORE building the incident,
@@ -572,7 +581,25 @@ async def run_incident(
         tool = rung.tool
 
         if tool == "reperceive":
-            detail: dict[str, Any] = {"params": dict(rung.params), "result": "stub_ok"}
+            detail: dict[str, Any] = {"params": dict(rung.params)}
+            second_cues: list[CueEvent] = []
+            if detector is not None and frames_in:
+                # Real re-observation: a cold detector re-runs CueDetector
+                # over the buffered pre-event frames; every cue kind that
+                # re-fires is logged as a second CueEvent (spec: reperceive
+                # must confirm the cue, not just assert it).
+                second_cues, telemetry = detector.reobserve(frames_in)
+                detail["result"] = "reobserved"
+                detail["second_opinion"] = telemetry
+                if second_cues:
+                    detail["confirmed"] = second_cues[0].kind == cue.kind
+                    detail["confirmed_kind"] = second_cues[0].kind
+            else:
+                # No detector or no buffered frames (fixture-injected cues):
+                # say so honestly instead of claiming a re-check happened.
+                detail["result"] = (
+                    "no_frames_buffered" if detector is not None else "stub_ok"
+                )
             if occlusion:
                 detail.update(
                     {
@@ -588,6 +615,20 @@ async def run_incident(
                 rung_id=rung.id,
                 detail=detail,
             )
+            for ev in second_cues:
+                events.append(
+                    AuditEvent(
+                        tool="cue",
+                        cue_kind=ev.kind,
+                        detail={
+                            "confidence": ev.confidence,
+                            "detail": ev.detail,
+                            "second_opinion": True,
+                            "source": "reperceive_cue_detector",
+                        },
+                        at=datetime.now(timezone.utc),
+                    )
+                )
             if store is not None:
                 store.save(incident)
             idx += 1

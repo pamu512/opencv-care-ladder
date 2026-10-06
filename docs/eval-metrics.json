@@ -1,10 +1,10 @@
 {
-  "cases": 10,
-  "cases_ran": 10,
+  "cases": 11,
+  "cases_ran": 11,
   "cases_skipped": 0,
   "cue_recall": 1.0,
   "false_escalation_rate": 0.0,
-  "mean_time_to_confirm_sec": 20.54,
+  "mean_time_to_confirm_sec": 18.01,
   "per_case": [
     {
       "case_id": "still_person",
@@ -43,6 +43,12 @@
       "time_to_cue_sec": null
     },
     {
+      "case_id": "covered_lens",
+      "expect": "camera_occlusion",
+      "emitted": "camera_occlusion",
+      "time_to_cue_sec": 0.3
+    },
+    {
       "case_id": "photo_person_still",
       "expect": "no_movement",
       "emitted": "no_movement",
@@ -52,22 +58,19 @@
       "case_id": "clip_real_fall_1",
       "expect": "distress_heuristic",
       "emitted": "distress_heuristic",
-      "time_to_cue_sec": 100.8,
-      "note": "KU Leuven fall re-enactment; sudden_vertical_to_horizontal at clip-time t=100.7 (fall occurs mid-clip)"
+      "time_to_cue_sec": 100.8
     },
     {
       "case_id": "clip_fall_2_two_tier",
       "expect": "no_movement",
       "emitted": "no_movement",
-      "time_to_cue_sec": 30.2,
-      "note": "gradual bed collapse (KU Leuven): pose fast path intentionally silent (pose unreliable on motionless subject); escalates via stillness at 30s plan timeout \u2014 two-tier escalation proven on real footage"
+      "time_to_cue_sec": 30.2
     },
     {
       "case_id": "clip_pedestrians_negative",
       "expect": "no_visibility",
       "emitted": "no_visibility",
-      "time_to_cue_sec": 0.8,
-      "note": "OpenCV vtest pedestrians: no distress cue (bend-over FP eliminated by sudden-only rule); mild no_visibility when people exit frame is correct ladder behavior"
+      "time_to_cue_sec": 0.8
     }
   ],
   "dnn": true

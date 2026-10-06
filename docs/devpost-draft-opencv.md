@@ -5,7 +5,7 @@
 **Draft already started:** https://devpost.com/submit-to/30984-opencv-ai-competition-2026-powered-by-aws/manage/submissions/1199879-care-ladder-vision/edit
 **Deadline:** Oct 26, 2026 @ 11:45pm PDT
 **Team (proposal):** NOTATEAM · member Anoop Pamu / pamu512
-**Repo tip at draft time:** main @ 175b370 (PR #15 Telegram-proven VO) after PR #14 a7357c0 (`fall_cls_v1.onnx`).
+**Repo tip at draft time:** main @ 19eaf07 (brutal-gap fix PR pending) after PR #14 a7357c0 (`fall_cls_v1.onnx`).
 **Do not invent grant award status.** AWS compute grant selection is unknown. Do not claim selected.
 
 No ML hype. No clinical claims. No live 911. Demo/simulator stack.
@@ -56,8 +56,8 @@ Additional Agentic Vision evidence:
 | AWS architecture prose | Ready | `infra/README.md` · `infra/ecs-task-outline.md` · `infra/task-definition.json` |
 | Eval + failure modes | Ready | `docs/eval-metrics.json` · `docs/failure-modes.md` |
 | Demo / video scripts | Ready | `docs/demo-script.md` · `docs/demo-video-script.md` @ 175b370 |
-| Canonical local mp4 (Desktop) | Ready, ~184.7s (~3:05), 1280x720 | Desktop `care-ladder-demo-chatterbox-telegram.mp4`. SHA-256 `fb6037b8e6f29411a816fd2ffb92c34946ef0fb3548a9ad502f6c49e1af7c874`. Canonical for Devpost until a follow-up PR replaces `docs/demo`. Structure: Path A → Path B Family chat mirror + ack → DNN/privacy → pre-seeded KU Leuven fall (privacy-blurred frame is intentional) → close. |
-| Repo mp4 on main | Stale 5:00 placeholder | `docs/demo/care-ladder-demo.mp4` (~4.6 MB, 300s). Not the Devpost cut. |
+| Canonical local mp4 (Desktop) | Ready, ~184.7s (~3:05), 1280x720 | Desktop `care-ladder-demo-chatterbox-telegram.mp4`. SHA-256 `fb6037b8e6f29411a816fd2ffb92c34946ef0fb3548a9ad502f6c49e1af7c874`. Canonical for Devpost. Structure: Path A → Path B Family chat mirror + ack → DNN/privacy → pre-seeded KU Leuven fall (privacy-blurred frame is intentional) → close. |
+| Repo mp4 on main | Replaced with the canonical cut | `docs/demo/care-ladder-demo.mp4` is now byte-identical to the Desktop cut (same SHA-256 `fb6037b8...`, ~4.4 MB, 184.7s). |
 | YouTube / Vimeo public or unlisted link | Ready (unlisted) | YouTube (unlisted): https://www.youtube.com/watch?v=LTECIQyNPJI |
 | Gallery thumbnail (JPG/PNG/GIF, ~3:2) | **GAP** | Capture from `/ui/` or diagram |
 | Static PNG architecture for gallery | Soft gap | HTML diagram exists; export PNG/SVG screenshot recommended |
@@ -136,6 +136,18 @@ Video link is already saved on the Devpost draft (still not Final Submitted). De
 ```markdown
 ## Inspiration
 
+Why I built this
+
+My mother lives alone in India. I'm in Hong Kong and my sister is in the EU. She refused assisted living and didn't want a full-time caretaker at home, and that's her right.
+
+We put a camera in her home, but it didn't help much. She hated being watched, and neither of us could watch a feed 24/7 from opposite sides of the world. She also often forgets to charge her phone. More than once that ended with panicked calls to neighbors, asking them to check on her because she was out of camera view and not answering.
+
+In the past six months she has fallen four times. Once she was hurt badly enough that she had to drag herself out of the bathroom to reach a phone.
+
+The camera was never the problem. The problem was that nobody could act on what it saw. Care Ladder turns the camera from a feed someone has to watch into something that checks in first. OpenCV notices stillness, a sudden fall, or a covered lens. Before anyone is paged, a voice check-in in the room asks if she's okay, so it works even when her phone is dead. If she says she's fine, it stands down and nobody gets a frightening call. If she's silent, it pages the family chat, and any of us can acknowledge from anywhere. If nobody responds, it moves on to the next person. Every step is logged, so we can see exactly what happened and why. Clips are blurred before they leave the device, because she should never feel watched.
+
+It is not a medical device and it will not call emergency services. It helps a family spread across three time zones know their mum is okay.
+
 One in four adults over 65 falls each year. For people living alone, the dangerous fall is the one nobody sees. Families often face a false choice: do nothing, or leave a camera feed that feels like surveillance.
 
 Care Ladder is a third path: a camera that **checks in before it escalates**, and proves every step on an audit timeline. Built for the OpenCV AI Competition 2026 (Agentic Vision path), team **NOTATEAM** (Anoop Pamu).
@@ -173,15 +185,8 @@ Privacy is enforced at attach: blur or silhouette runs **before** any pre-event 
 **Agent + AWS**
 
 - FastAPI caregiver console and incident API
-- ECS Fargate (live tip: **X86_64**) behind CloudFront + ALB
-- DynamoDB incident store, S3 privacy-filtered clips, EventBridge cue bus + archive rule, ECR, CloudWatch Logs
-- GitHub Actions: tests + real-footage eval → build amd64 image → ECR → roll service (push to `main` is a verified deploy)
-
-**Demo honesty**
-
-- Demo / simulator stack: stub dialer, scripted speaker, reserved NANP fiction numbers (`NPA-555-01XX`)
-- No live camera required for judge fixtures; upload and synthetic paths available
-- No medical or accuracy claims beyond the labeled harness
+- The AWS path is live, not sketched: CloudFront serves the console over HTTPS in front of an ALB; ECS Fargate (**X86_64**) runs the OpenCV 5 DNN pair and FastAPI as a self-healing service from an ECR image (scan-on-push); DynamoDB is the durable incident store behind the audit timeline; S3 holds only privacy-transformed (silhouette) pre-event clips with public access blocked; EventBridge carries every cue on a dedicated bus with a CloudWatch archive rule; GitHub Actions runs tests plus real-footage evals, then rolls the service, so a push to `main` is a verified deploy
+- Demo honesty: stub dialer, scripted speaker, reserved NANP fiction numbers (`NPA-555-01XX`), no medical or accuracy claims beyond the labeled harness
 
 ## Challenges we ran into
 
@@ -193,7 +198,7 @@ Privacy is enforced at attach: blur or silhouette runs **before** any pre-event 
 
 ## Accomplishments that we're proud of
 
-- Labeled eval (with DNN + real clips): cue recall **1.00**, false-escalation rate **0.00**, mean time-to-confirm ~20.5 s (`docs/eval-metrics.json`)
+- Eval honesty first: the labeled harness is **n=11 cases** (synthetic fixtures including covered-lens occlusion, plus three real-footage cases: one hard fall, one gradual collapse, one pedestrian negative). On that small set the cues behaved as designed (recall 1.00, no false escalations, mean time-to-confirm 18.0 s incl. real clips); that is directional evidence at demo scale, not a clinical validation, and we say so on the timeline and in `docs/failure-modes.md`
 - Real KU Leuven fall re-enactment fires `distress_heuristic` / `sudden_vertical_to_horizontal`; gradual bed collapse escalates via stillness; OpenCV vtest pedestrians do not fire distress
 - Live HTTPS demo on AWS with privacy-only clips and a full audit timeline
 - Confirm-before-escalate UX that families can understand in one click (Path A / Path B fixtures)
@@ -263,9 +268,9 @@ Care Ladder agentic workflow: OpenCV 5 perception → YAML ladder decision → A
 
 1. Canonical cut is Desktop `care-ladder-demo-chatterbox-telegram.mp4` (~184.7s / ~3:05, 1280x720, SHA-256 `fb6037b8e6f29411a816fd2ffb92c34946ef0fb3548a9ad502f6c49e1af7c874`). Script: `docs/demo-video-script.md` @ 175b370.
 2. Structure: Path A → Path B Family chat mirror + ack → DNN/privacy → pre-seeded KU Leuven fall (privacy-blurred frame is intentional) → close.
-3. Repo file `docs/demo/care-ladder-demo.mp4` may still be the old 5:00 placeholder on main. Do not upload that to Devpost. A follow-up PR should replace `docs/demo` with the new cut.
+3. Repo file `docs/demo/care-ladder-demo.mp4` is now byte-identical to the canonical cut (same SHA-256). Either source is safe to reference.
 4. YouTube (unlisted): https://www.youtube.com/watch?v=LTECIQyNPJI
-5. Video is already saved on the Devpost draft. Do not re-upload the stale repo 5:00 placeholder.
+5. Video is already saved on the Devpost draft. Do not re-upload.
 6. Description attribution: KU Leuven fall clips; OpenCV Zoo models; OpenCV vtest.
 
 ---

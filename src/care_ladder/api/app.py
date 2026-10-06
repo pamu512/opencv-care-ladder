@@ -51,6 +51,7 @@ SUPPORTED_FIXTURES = frozenset(
         "opencv_dnn_person",
         "opencv_pose_person",
         "opencv_occlusion",
+        "opencv_distress",
         "speaker_soft_ok",
         "speaker_needs_human",
         "path_b_inflight",
@@ -254,6 +255,26 @@ def _synthetic_occlusion_frames(
     return [np.full((height, width, 3), 4, dtype=np.uint8) for _ in range(4)]
 
 
+def _synthetic_distress_frames(
+    *,
+    width: int = 640,
+    height: int = 480,
+    n: int = 8,
+) -> list[np.ndarray]:
+    """Low, wide, motionless blob: shape-heuristic distress stand-in.
+
+    Aspect 320/120 = 2.67 >= 2.0 and centroid y-ratio 400/480 = 0.83 >= 0.65,
+    sustained past ``distress_sustain_sec`` (2 s at the 0.5 s sample grid).
+    Non-clinical demo fixture only.
+    """
+    frames: list[np.ndarray] = []
+    for _ in range(n):
+        f = np.zeros((height, width, 3), dtype=np.uint8)
+        f[340:460, 200:520] = 200
+        frames.append(f)
+    return frames
+
+
 async def _run_opencv_occlusion(store: AuditStore):
     """Fixture: covered-lens frames → CueDetector camera_occlusion → inform-only Path B."""
     plan = load_care_plan(_DEMO_PLAN_PATH)
@@ -281,6 +302,7 @@ async def _run_opencv_occlusion(store: AuditStore):
         speaker=speaker,
         dialer=dialer,
         pre_event_frames=frames[-2:],
+        detector=detector,
         store=store,
         privacy_mode="silhouette",
         now=DEMO_NOW,
@@ -393,6 +415,49 @@ def _synthetic_stillness_frames(
     return frames
 
 
+async def _run_opencv_distress(store: AuditStore):
+    """Fixture: on-floor shape frames → CueDetector distress_heuristic → ladder.
+
+    Runs the contour-blob shape heuristic (aspect + y-ratio, sustained) on
+    synthetic frames so the pre-seeded distress path needs no ONNX download.
+    Non-clinical stand-in: the cue detail says so on the timeline.
+    """
+    plan = load_care_plan(_DEMO_PLAN_PATH)
+    detector = CueDetector.from_plan(plan, zone_id="living_room")
+    frames = _synthetic_distress_frames()
+    cue: CueEvent | None = None
+    for frame, t in zip(frames, [i * 0.5 for i in range(len(frames))], strict=True):
+        cue = detector.observe(frame, t=t)
+        if cue is not None:
+            break
+    if cue is None or cue.kind != "distress_heuristic":
+        raise RuntimeError("opencv_distress fixture: CueDetector did not emit distress_heuristic")
+
+    cue.detail = {
+        **cue.detail,
+        "source": "opencv_cue_detector",
+        "fixture": "opencv_distress",
+        "non_clinical": True,
+        "note": "coarse aspect/y heuristic only; not a medical diagnosis",
+    }
+    speaker = SpeakerSimulator(scripted=[])
+    dialer = StubDialer(behavior={"caregiver": "no_answer", "secondary": "answered"})
+    return await run_incident(
+        cue=cue,
+        plan=plan,
+        speaker=speaker,
+        dialer=dialer,
+        # 6 frames = a 3 s reobservation window (dt 0.5): long enough for the
+        # cold second-pass detector to re-arm the 2 s shape sustain and log a
+        # second distress CueEvent; 4 frames (2 s) cannot.
+        pre_event_frames=frames[-6:],
+        detector=detector,
+        store=store,
+        privacy_mode="blur",
+        now=DEMO_NOW,
+    )
+
+
 async def _run_opencv_stillness(store: AuditStore):
     """Fixture: synthetic frames → CueDetector.observe → run_incident (OpenCV path)."""
     plan = load_care_plan(_DEMO_PLAN_PATH)
@@ -432,6 +497,7 @@ async def _run_opencv_stillness(store: AuditStore):
         speaker=speaker,
         dialer=dialer,
         pre_event_frames=frames[-2:],
+        detector=detector,
         store=store,
         privacy_mode="blur",
         now=DEMO_NOW,
@@ -488,11 +554,27 @@ async def _run_opencv_dnn_person(store: AuditStore):
         speaker=speaker,
         dialer=dialer,
         pre_event_frames=[photo],
+        detector=detector,
         store=store,
         privacy_mode="silhouette",
         now=DEMO_NOW,
     )
     return incident
+
+
+async def _seed_cold_start(store: AuditStore) -> None:
+    """Pre-seed the distress fixture on an empty store (cold-start pin, slice 4).
+
+    One synthetic-shape distress incident so the fall-signature path is the
+    first thing a judge sees. Best-effort only: if the seed fails (e.g. plan
+    drift), the console simply starts empty as before.
+    """
+    try:
+        incident = await _run_opencv_distress(store)
+        incident.cue.detail = {**incident.cue.detail, "seeded": True}
+        store.save(incident)
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"WARNING: cold-start distress seed failed: {exc}")
 
 
 def _default_store() -> AuditStore:
@@ -568,7 +650,8 @@ async def _run_opencv_pose_person(store: AuditStore):
     dialer = StubDialer(behavior={})
     return await run_incident(
         cue=cue, plan=plan, speaker=speaker, dialer=dialer,
-        pre_event_frames=[photo], store=store, privacy_mode="silhouette", now=DEMO_NOW,
+        pre_event_frames=[photo], detector=detector, store=store,
+        privacy_mode="silhouette", now=DEMO_NOW,
     )
 
 
@@ -618,6 +701,7 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
     application.state.store = audit
     application.state.telegram = telegram
     application.state.bot_registry = bot_registry
+    application.state.seeded = False
 
     static_dir = Path(__file__).resolve().parent / "static"
     application.mount("/ui", StaticFiles(directory=static_dir, html=True), name="ui")
@@ -729,6 +813,13 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
 
     @application.get("/incidents")
     def list_incidents() -> list[dict[str, Any]]:
+        if not application.state.seeded and not application.state.store.list_incidents():
+            # Cold start (fresh deploy / empty store): pin the pre-seeded
+            # distress incident so judges landing on /ui/ see the fall-signature
+            # path immediately instead of an empty console. Seeded incidents
+            # carry a marker so downstream tooling can tell them apart.
+            asyncio.run(_seed_cold_start(application.state.store))
+            application.state.seeded = True
         return [_incident_summary(i) for i in application.state.store.list_incidents()]
 
     @application.get("/incidents/{incident_id}")
@@ -1005,6 +1096,7 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
                 speaker=speaker,
                 dialer=dialer,
                 pre_event_frames=result.pre_event_frames[-4:],
+                detector=detector,
                 store=store,
                 privacy_mode="blur",
                 now=DEMO_NOW,
@@ -1099,6 +1191,8 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
             incident = await _run_opencv_pose_person(application.state.store)
         elif body.fixture == "opencv_occlusion":
             incident = await _run_opencv_occlusion(application.state.store)
+        elif body.fixture == "opencv_distress":
+            incident = await _run_opencv_distress(application.state.store)
         elif body.fixture == "speaker_soft_ok":
             incident = await _run_speaker_soft_ok(application.state.store)
         elif body.fixture == "speaker_needs_human":

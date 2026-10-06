@@ -34,7 +34,7 @@ never touches rung order or the fail-closed emergency gate. See
    - `camera_occlusion` - lens covered / unreadable (privacy + camera-health, **not** distress)
    - `distress_heuristic` - simple motion/pose heuristic (not a medical assessment)
 2. **Orchestrator (`run_incident`)** starts an incident from that cue and walks `configs/demo_home.yaml` **rungs** in order, appending an audit event per step:
-   - `reperceive` → confirm / stub re-check (occlusion holds as camera-health)
+   - `reperceive` → **real re-check**: when the caller passes the `CueDetector` and buffered pre-event frames, a cold copy of the detector re-observes the frames and logs a second `CueEvent` per cue kind that re-fires (`result: reobserved`, `confirmed: true|false` on the audit detail); without them the rung honestly logs `stub_ok` / `no_frames_buffered` (occlusion holds as camera-health either way)
    - `speaker_prompt` → smart-speaker simulator “Are you okay?” (or “clear the lens?” on occlusion)
    - `wait` → listen / settle window (bounded in demo; interruptible by Acknowledge)
    - `notify_caretaker` → family **BotThread** page (Telegram inform card `1|2|3`, or FakeTelegram stub) + console fallback; Acknowledge or Telegram ack stands the ladder down
@@ -58,6 +58,7 @@ Demo fixtures:
 - `family_paged_inflight` - silence path left **open** in BotThread `family_paged` so Telegram webhook or console Acknowledge can stop dial.
 - `speaker_soft_ok` / `speaker_needs_human` - same stillness cue, different intent (`clear_ok` vs `needs_human`) and therefore different next tools.
 - `opencv_occlusion` - **covered-lens frames** through `CueDetector` → `camera_occlusion` → ask to clear the lens → inform caretaker (no distress, no dial). UI label: **No reading · lens covered**.
+- `opencv_distress` - **on-floor shape frames** through `CueDetector` → `distress_heuristic` (non-clinical aspect/y heuristic) → silence escalates. This is the fixture pre-seeded on an empty store at cold start.
 - `opencv_stillness` - feeds **synthetic numpy frames** through `CueDetector.observe` (OpenCV), then `run_incident`; audit cue is tagged `source: opencv_cue_detector`.
 - `opencv_dnn_person` - feeds a **real photo** through the **MediaPipe person-detection ONNX via OpenCV 5 DNN** (`models/`, run `scripts/download_models.sh` once), then the ladder; audit cue is tagged `source: opencv_dnn_person_detector` with detector name. Frames attach as silhouettes.
 
@@ -113,10 +114,14 @@ Returns `{"incident_id":"<id>"}`.
 ### 2b. Or use the caregiver console UI
 
 Open **http://127.0.0.1:8000/ui/** - **setup + day archive** console. The **Demo scenarios**
-strip is collapsed by default. A read-only **Family chat (mirror)** panel shows BotThread
-state and the last inform card (`GET /family/runtime`, source `stub|live|demo_fixture`).
-Acknowledge on an incident card remains a secondary ack source. Status language is Calm
-Care-Tech (Care plan active / Checking on Pat / Camera blocked / Resolved).
+strip opens automatically on a browser's first visit (cold start) and an empty store
+pre-seeds one `distress_heuristic` incident so the fall-signature path is visible
+immediately; the strip collapses on later visits. A read-only **Family chat (mirror)**
+panel shows BotThread state and the last inform card (`GET /family/runtime`, source
+`stub|live|demo_fixture`). Acknowledge on an incident card remains a secondary ack
+source. Status language is Calm Care-Tech (Care plan active / Checking on Pat /
+Camera blocked / Resolved). Uploads state upfront that cloud analysis of a clip takes
+minutes.
 
 ### Telegram BotThread (optional live)
 
@@ -168,8 +173,11 @@ E2E demo path: `tests/test_e2e_demo.py` (fixture → incident has ≥3 audit eve
 
 ## Fall classifier train (Kaggle, this repo only)
 
-This repo owns `models/fall_cls_v1.onnx`. Sibling CareLadder repos consume the
-artifact later. There is no second trainer.
+`models/fall_cls_v1.onnx` is **not in the `/ui/` decision path**. Nothing in the
+serving stack (`CueDetector`, `run_incident`, the API) imports or executes it;
+the live fall signature is the MediaPipe pose chain + OpenCV heuristics. The
+classifier is a versioned artifact for later sibling consume PRs, and this repo
+owns its training. There is no second trainer.
 
 Datasets stay on the Kaggle `fall` + Computer Vision search. Train slug is
 `elwalyahmad/fall-detection` after a live license check (CC0 on the 2026-10-04

@@ -317,6 +317,68 @@ class CueDetector:
 
         return None
 
+    def reobserve(
+        self,
+        frames: Sequence[np.ndarray],
+        *,
+        t0: float = 0.0,
+        dt: float = 0.5,
+    ) -> tuple[list[CueEvent], dict[str, Any]]:
+        """Re-run cue detection over ``frames`` for the reperceive rung.
+
+        A fresh detector over the buffered frames means the second opinion
+        carries no state from the first pass: stillness/presence timers and
+        the occlusion latch start cold, exactly as they did when the cue
+        first fired. Returns ``(events, telemetry)``; ``events`` holds only
+        the cues that re-fired within the window (an empty list is a valid,
+        honest answer - it does not mean "person is fine", it means the
+        window was too short to re-arm).
+        """
+        det = self._clone_cold()
+        events: list[CueEvent] = []
+        seen_kinds: set[str] = set()
+        last_detail: dict[str, Any] | None = None
+        for i, frame in enumerate(frames):
+            ev = det.observe(frame, t=t0 + i * dt)
+            if ev is not None and ev.kind not in seen_kinds:
+                seen_kinds.add(ev.kind)
+                events.append(ev)
+            if ev is not None:
+                last_detail = ev.detail
+        telemetry: dict[str, Any] = {
+            "frames": len(frames),
+            "window_sec": round(len(frames) * dt, 2),
+            "detected": [e.kind for e in events],
+            "motion_mean_threshold": self.motion_mean_threshold,
+            "detection_source": det.last_detection_source,
+            "window_too_short": not events
+            and len(frames) * dt < self.no_movement_timeout_sec,
+        }
+        if last_detail is not None and events:
+            telemetry["last_detail"] = dict(events[-1].detail)
+        return events, telemetry
+
+    def _clone_cold(self) -> "CueDetector":
+        """Fresh detector with the same configuration, no accumulated state."""
+        return CueDetector(
+            no_movement_timeout_sec=self.no_movement_timeout_sec,
+            zone=self.zone.tolist(),
+            motion_mean_threshold=self.motion_mean_threshold,
+            min_blob_area=self.min_blob_area,
+            distress_sustain_sec=self.distress_sustain_sec,
+            distress_aspect_min=self.distress_aspect_min,
+            distress_y_ratio_min=self.distress_y_ratio_min,
+            binary_threshold=self.binary_threshold,
+            enable_no_movement=self.enable_no_movement,
+            enable_no_visibility=self.enable_no_visibility,
+            enable_distress_heuristic=self.enable_distress_heuristic,
+            enable_camera_occlusion=self.enable_camera_occlusion,
+            person_detector=self.person_detector,
+            motion_source=self.motion_source,
+            tracking_enabled=self.tracking_enabled,
+            pose_model=self.pose_model,
+        )
+
     def _point_in_zone(self, x: float, y: float) -> bool:
         # >= 0 means inside or on edge
         return cv2.pointPolygonTest(self.zone, (float(x), float(y)), False) >= 0.0

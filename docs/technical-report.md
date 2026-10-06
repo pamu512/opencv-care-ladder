@@ -4,6 +4,18 @@
 
 ## 1. What it is
 
+Why I built this
+
+My mother lives alone in India. I'm in Hong Kong and my sister is in the EU. She refused assisted living and didn't want a full-time caretaker at home, and that's her right.
+
+We put a camera in her home, but it didn't help much. She hated being watched, and neither of us could watch a feed 24/7 from opposite sides of the world. She also often forgets to charge her phone. More than once that ended with panicked calls to neighbors, asking them to check on her because she was out of camera view and not answering.
+
+In the past six months she has fallen four times. Once she was hurt badly enough that she had to drag herself out of the bathroom to reach a phone.
+
+The camera was never the problem. The problem was that nobody could act on what it saw. Care Ladder turns the camera from a feed someone has to watch into something that checks in first. OpenCV notices stillness, a sudden fall, or a covered lens. Before anyone is paged, a voice check-in in the room asks if she's okay, so it works even when her phone is dead. If she says she's fine, it stands down and nobody gets a frightening call. If she's silent, it pages the family chat, and any of us can acknowledge from anywhere. If nobody responds, it moves on to the next person. Every step is logged, so we can see exactly what happened and why. Clips are blurred before they leave the device, because she should never feel watched.
+
+It is not a medical device and it will not call emergency services. It helps a family spread across three time zones know their mum is okay.
+
 Care Ladder is a remote wellness monitor for seniors and recovering people. OpenCV 5
 perception emits structured cues (`no_movement`, `no_visibility`, `distress_heuristic`);
 an agent walks a **configurable YAML escalation ladder** - re-perceive → smart-speaker
@@ -58,15 +70,26 @@ Branching is driven by cue kind + channel replies; every jump emits an audit eve
 `from_index`/`to_index`/`reason`. Quiet hours (`soft_suppress_non_distress`) suppress
 non-distress cues inside the window - suppression itself is audited.
 
-## 4. Evaluation (labeled fixtures, reproducible)
+## 4. Evaluation (labeled fixtures, reproducible - honest scope first)
 
 `python scripts/evaluate.py --dnn --json docs/eval-metrics.json`
 
+The harness is **n=11 cases**: synthetic fixtures plus three real-footage cases (one
+hard fall, one gradual collapse, one pedestrian negative). That is demo-scale evidence,
+not a clinical validation; failure modes are documented in
+[`failure-modes.md`](failure-modes.md) and the numbers below should be read with that
+sample size in mind.
+
 | Metric | Result |
 | --- | --- |
-| Cue recall (positive cases) | **1.00** (7/7: still person, leaves zone, on-floor, real photo via DNN, **real fall clip**, post-fall stillness, pedestrians-exit) |
-| False-escalation rate (negative cases) | **0.00** (active person, pet motion, illumination ramp, pedestrian bend-overs) |
-| Mean time-to-confirm | **20.5 s** across cases (incl. real clips; synthetic-only cases ≈3 s; plan timeouts user-configured) |
+| Cue recall (positive cases) | 1.00 (8/8 on this n=11 set: still person, leaves zone, on-floor, covered lens, real photo via DNN, **real fall clip**, post-fall stillness, pedestrians-exit) |
+| False-escalation rate (negative cases) | 0.00 (3/3: active person, pet motion, illumination ramp; pedestrian bend-overs held silent on real footage) |
+| Mean time-to-confirm | 18.0 s across cases (incl. real clips; synthetic-only cases ≈3 s; plan timeouts user-configured) |
+
+A perfect score on eleven cases is a smoke test that every path still fires, not a
+sensitivity claim. Known failure modes (pets defeating stillness, lighting churn,
+blob-not-person) are enumerated in the failure-modes doc and encoded as the negative
+cases above.
 
 **Real-footage validation** (clips fetched by `scripts/download_clips.sh`, cases run in CI):
 
@@ -106,6 +129,13 @@ a push to `main` is a verified deploy. The full pose fall path runs inside Farga
 uploading the real fall clip via the public endpoint yields
 `distress_heuristic` / `sudden_vertical_to_horizontal` / `source: pose_heuristics`
 (~5 min async job at 5 Hz sampling on 0.5 vCPU).
+
+**Fall classifier scope:** `models/fall_cls_v1.onnx` is a Kaggle-trained edge
+classifier that is **not wired into the `/ui/` decision path** - nothing in the
+serving stack imports it; OpenCV cues and the pose chain drive the ladder. Its
+card metrics are honest and modest: in-domain Kaggle test sensitivity 0.664 /
+specificity 0.735 (below the 0.85 report target), cross-dataset sensitivity
+0.522 (`models/MODEL_CARD.md`). It is versioned for later sibling consume PRs.
 
 ## 6. Responsible use
 

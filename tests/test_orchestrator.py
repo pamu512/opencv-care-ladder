@@ -118,6 +118,102 @@ def test_reperceive_appears_in_audit_trace():
     assert "reperceive" in tools
 
 
+def test_reperceive_reobserves_frames_and_logs_second_cue():
+    """Slice 1: reperceive re-runs CueDetector over buffered frames.
+
+    Occlusion is the cleanest witness: uniform frames re-fire camera_occlusion
+    on a cold detector without needing a long stillness window.
+    """
+    import numpy as np
+
+    from care_ladder.vision.cues import CueDetector
+
+    plan = load_care_plan(Path("configs/demo_home.yaml"))
+    detector = CueDetector.from_plan(plan, zone_id="living_room")
+    frames = [np.full((480, 640, 3), 4, dtype=np.uint8) for _ in range(4)]
+
+    cue: CueEvent | None = None
+    for frame, t in zip(frames, [0.0, 0.4, 0.8, 1.2], strict=True):
+        cue = detector.observe(frame, t=t)
+        if cue is not None:
+            break
+    assert cue is not None and cue.kind == "camera_occlusion"
+
+    incident = asyncio.run(
+        run_incident(
+            cue=cue,
+            plan=plan,
+            speaker=SpeakerSimulator(scripted=[]),
+            dialer=StubDialer(behavior={"caregiver": "answered"}),
+            pre_event_frames=frames[-2:],
+            detector=detector,
+            now=DAYTIME,
+        )
+    )
+    rep = next(e for e in incident.events if e.tool == "reperceive")
+    assert rep.detail["result"] == "reobserved"
+    assert rep.detail["confirmed"] is True
+    assert rep.detail["confirmed_kind"] == "camera_occlusion"
+    assert rep.detail["second_opinion"]["frames"] == 2
+    # second CueEvent logged after the reperceive audit event
+    second = [
+        e
+        for e in incident.events
+        if e.tool == "cue"
+        and (e.detail or {}).get("second_opinion") is True
+    ]
+    assert len(second) == 1
+    assert second[0].cue_kind == "camera_occlusion"
+    assert (second[0].detail or {}).get("source") == "reperceive_cue_detector"
+    assert incident.events.index(rep) < incident.events.index(second[0])
+
+
+def test_reperceive_without_detector_stays_honest_stub():
+    """No detector passed: the rung must say stub_ok, not claim a re-check."""
+    plan = load_care_plan(Path("configs/demo_home.yaml"))
+    cue = CueEvent(kind="no_movement", confidence=0.9, detail={})
+    incident = asyncio.run(
+        run_incident(
+            cue=cue,
+            plan=plan,
+            speaker=SpeakerSimulator(scripted=["ok"]),
+            dialer=StubDialer(behavior={"caregiver": "answered"}),
+            pre_event_frames=[],
+            now=DAYTIME,
+        )
+    )
+    rep = next(e for e in incident.events if e.tool == "reperceive")
+    assert rep.detail["result"] == "stub_ok"
+    assert "confirmed" not in rep.detail
+    assert not any(
+        (e.detail or {}).get("second_opinion") for e in incident.events if e.tool == "cue"
+    )
+
+
+def test_reperceive_detector_without_frames_is_labeled():
+    """Detector but no buffered frames: no_frames_buffered, no second cue."""
+    import numpy as np
+
+    from care_ladder.vision.cues import CueDetector
+
+    plan = load_care_plan(Path("configs/demo_home.yaml"))
+    detector = CueDetector.from_plan(plan, zone_id="living_room")
+    cue = CueEvent(kind="no_movement", confidence=0.9, detail={})
+    incident = asyncio.run(
+        run_incident(
+            cue=cue,
+            plan=plan,
+            speaker=SpeakerSimulator(scripted=["ok"]),
+            dialer=StubDialer(behavior={"caregiver": "answered"}),
+            pre_event_frames=[],
+            detector=detector,
+            now=DAYTIME,
+        )
+    )
+    rep = next(e for e in incident.events if e.tool == "reperceive")
+    assert rep.detail["result"] == "no_frames_buffered"
+
+
 def test_pre_event_frames_privacy_blur_before_attach():
     """C1: non-empty pre_event_frames must be privacy-transformed before attach count."""
     plan = load_care_plan(Path("configs/demo_home.yaml"))

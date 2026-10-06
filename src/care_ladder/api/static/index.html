@@ -84,6 +84,7 @@
   .triggers{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap;padding:14px 18px}
   .tgroup{display:flex;flex-direction:column;gap:8px}
   .tgroup>span{font:600 10.5px/1 var(--font-mono);text-transform:uppercase;letter-spacing:.09em;color:var(--faint)}
+  .tgroup .hint{font:400 11px/1.5 var(--font-body);text-transform:none;letter-spacing:0;color:var(--faint);max-width:34ch}
   .trow{display:flex;gap:8px;flex-wrap:wrap}
   .btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border-strong);
     background:var(--surface-2);color:var(--fg);border-radius:var(--r-s);padding:9px 14px;
@@ -425,11 +426,12 @@
 
 <div class="consolebar">
   <section class="panel" aria-label="Demo scenarios">
-    <details class="demo-strip">
+    <details class="demo-strip" id="demo-strip">
     <summary>Demo scenarios</summary>
     <div class="triggers">
       <div class="tgroup">
-        <span>Guided demo</span>
+        <span>Guided demo · start here</span>
+        <span class="hint">Path A clears on a verbal OK. Path B escalates on silence. The distress path below is pre-seeded: it is already on the timeline when you arrive.</span>
         <div class="trow">
           <button class="btn primary" data-fixture="no_movement_ok" type="button">
             <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>
@@ -437,6 +439,9 @@
           <button class="btn primary" data-fixture="no_movement_silence" type="button">
             <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-mic"/></svg>
             Path B · silence escalates</button>
+          <button class="btn primary" data-fixture="opencv_distress" type="button">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-alert"/></svg>
+            Fall signature · on floor</button>
           <button class="btn" data-fixture="path_b_inflight" type="button">
             <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>
             Path B · ack mid-flight</button>
@@ -483,6 +488,7 @@
             <input type="file" id="clip-input" accept="video/mp4,video/quicktime,video/x-msvideo,video/webm" hidden>
           </label>
         </div>
+        <span class="hint">Upload analysis runs in the cloud and can take minutes (a 100 s clip ≈ 5 min on the demo task). The page keeps polling; you can leave it running.</span>
         <span class="upload-status" id="upload-status" aria-live="polite"></span>
       </div>
       <div class="tgroup">
@@ -878,6 +884,10 @@ function detailText(ev){
   if (d.source) b.push("source: "+esc(d.source));
   if (d.privacy) b.push("privacy: "+esc(d.privacy));
   if (d.sec!=null && d.slept_sec!=null) b.push(`wait ${d.sec}s (slept ${d.slept_sec}s)`);
+  if (d.second_opinion) b.push(`second opinion: ${esc((d.second_opinion.detected||[]).join(", ")||"nothing re-fired")} · ${d.second_opinion.frames} frames / ${d.second_opinion.window_sec}s${d.second_opinion.window_too_short?" · window too short to re-arm":""}`);
+  if (d.second_opinion===true) b.push("second CueEvent from re-check");
+  if (d.confirmed===true) b.push("cue confirmed");
+  else if (d.confirmed===false) b.push("cue NOT re-confirmed");
   if (d.note) b.push(esc(d.note));
   if (d.state) b.push("bot: "+esc(d.state));
   return b.join(" · ");
@@ -1215,6 +1225,16 @@ async function refreshLearningBadge(){
 
 bindFixtures();
 refresh(true);
+// Cold start: a judge's first visit should not present a collapsed strip.
+// The seeded distress incident keeps the timeline non-empty; open the strip
+// so the guided Path A / Path B buttons are visible without hunting.
+(function openStripOnColdStart(){
+  const strip = document.getElementById("demo-strip");
+  if (strip && !localStorage.getItem("cl-seen")){
+    strip.open = true;
+    localStorage.setItem("cl-seen","1");
+  }
+})();
 refreshLearningBadge();
 refreshFamilyMirror();
 setInterval(()=>{ if(!document.hidden) refreshLearningBadge(); }, 20000);
