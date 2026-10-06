@@ -421,7 +421,7 @@
 
 <div class="hero">
   <p class="hero-line">Vision spots the moment; the ladder picks the next human-safe step.</p>
-  <p class="hero-sub" id="learning-explain">Adaptive stillness timeout follows the household’s usual day — not a clinical score.</p>
+  <p class="hero-sub" id="learning-explain">Adaptive stillness timeout follows the household's usual day - not a clinical score.</p>
 </div>
 
 <div class="consolebar">
@@ -644,7 +644,7 @@ function verdict(inc){
     return `Quiet-hours policy (<b>${esc(d.quiet_hours_start||"22:00")}-${esc(d.quiet_hours_end||"07:00")}</b>) suppressed this non-distress cue. Suppression is recorded, not dropped; distress cues always run.`;
   }
   if (inc.cue.kind === "camera_occlusion")
-    bits.push("<b>No reading · lens covered</b> — camera health, not distress");
+    bits.push("<b>No reading · lens covered</b> - camera health, not distress");
   else if (inc.cue.kind === "distress_heuristic")
     bits.push("Fall signature detected");
   else
@@ -656,7 +656,7 @@ function verdict(inc){
     const k = sp.detail?.reply_kind;
     if (intent === "clear_ok" || k === "ok") bits.push(`check-in intent <b>clear_ok</b> (“${esc(sp.detail.reply_raw||"I’m fine")}”)`);
     else if (intent === "needs_human" || k === "call_caregiver") bits.push(`check-in intent <b>needs_human</b>`);
-    else bits.push("check-in intent <b>unclear</b> — no reply we can trust");
+    else bits.push("check-in intent <b>unclear</b> - no reply we can trust");
   }
   const nt = inc.events.find(e=>e.tool==="notify_caretaker");
   if (nt){
@@ -689,14 +689,14 @@ function transcriptHTML(inc){
   const quote = raw ? `“${esc(raw)}”` : "no spoken reply";
   return `<div class="quote"><div class="who">Check-in
     ${intent?`<span class="pill p-plain intent">${esc(INTENT_LABEL[intent]||intent)}</span>`:""}</div>
-    <p>${esc(sp.detail?.text||"Are you okay?")} — <span class="q">${quote}</span></p></div>`;
+    <p>${esc(sp.detail?.text||"Are you okay?")} - <span class="q">${quote}</span></p></div>`;
 }
 function explainHTML(inc){
   const x = inc.explain || {};
-  const duration = x.duration_sec!=null ? `${Number(x.duration_sec).toFixed(1)}s` : "—";
+  const duration = x.duration_sec!=null ? `${Number(x.duration_sec).toFixed(1)}s` : "-";
   const who = x.acked_by || inc.acked_by || "not yet";
   const vision = x.vision || CUE_LABEL[inc.cue.kind] || inc.cue.kind;
-  const did = (x.actions||[]).map(a=>a.label).filter(Boolean).slice(0,5).join(" · ") || "—";
+  const did = (x.actions||[]).map(a=>a.label).filter(Boolean).slice(0,5).join(" · ") || "-";
   return `<div class="explain" aria-label="Incident explain">
     <div><span>What vision knew</span><b>${esc(vision)}</b></div>
     <div><span>What we did</span><b>${esc(did)}</b></div>
@@ -714,7 +714,7 @@ function rungNode(id, tool, detail){
     const ph = detail?.phone_e164 || "";
     sub = ph ? ph.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, "+1 $1 $2 $3") : "";
   } else if (tool === "speaker_prompt"){
-    sub = "Nest/Alexa-style";
+    sub = "smart speaker";
   } else if (tool === "wait"){
     sub = detail?.sec != null ? `${detail.sec}s` : "";
   } else if (tool === "reperceive"){
@@ -954,7 +954,7 @@ function renderIncident(inc, frames){
       </span>
     </div>
     ${distress?`<div class="fall-banner">${icon("i-alert")}Fall signature detected: sudden vertical-to-horizontal transition; the ladder escalates past the verbal rung.</div>`:""}
-    ${blocked?`<div class="fall-banner" style="color:var(--info);background:var(--info-dim)">${icon("i-shield")}Camera blocked — privacy / camera-health path. No distress is being claimed.</div>`:""}
+    ${blocked?`<div class="fall-banner" style="color:var(--info);background:var(--info-dim)">${icon("i-shield")}Camera blocked - privacy / camera-health path. No distress is being claimed.</div>`:""}
     <div class="verdict">${icon("i-shield")}<p>${verdict(inc)}</p></div>
     ${transcriptHTML(inc)}
     ${explainHTML(inc)}
@@ -1218,7 +1218,7 @@ async function refreshLearningBadge(){
     badge.title = `stillness timeout ${Math.round(d.effective_no_movement_timeout_sec/60)}m (plan ${Math.round(d.plan_timeout_sec/60)}m) · ${d.confirmed_ok_days}/${d.settled_after_days} OK days`;
     const explain = $("#learning-explain");
     if (explain && d.explain){
-      explain.textContent = d.explain + " — not a clinical score, and it never moves the emergency gate.";
+      explain.textContent = d.explain + " - not a clinical score, and it never moves the emergency gate.";
     }
   }catch{ /* endpoint absent: badge stays hidden */ }
 }

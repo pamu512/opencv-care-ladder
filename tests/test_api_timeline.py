@@ -41,7 +41,7 @@ def test_demo_run_returns_timeline_with_ordered_steps_and_caregiver_name():
     assert prompt_events
     prompt_text = prompt_events[0]["detail"]["text"]
     # Caregiver display_name from configs/demo_home.yaml
-    assert "Alex" in prompt_text
+    assert "Jamie" in prompt_text
 
 
 def test_get_unknown_incident_returns_404():

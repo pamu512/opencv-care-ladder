@@ -25,7 +25,7 @@ def test_mixed_hurt_never_invents_ok():
 
 
 def test_explicit_help_is_needs_human():
-    for phrase in ("please come", "call Alex", "yes call", "I need help"):
+    for phrase in ("please come", "call Jamie", "yes call", "I need help"):
         assert classify_response_intent(phrase) == "needs_human", phrase
 
 
