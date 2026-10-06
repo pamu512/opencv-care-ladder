@@ -1,10 +1,12 @@
-# Care Ladder Vision v2 - Demo Video Script (main @ 269a695)
+# OpenCV Care Ladder — judge demo VO (v3 cut / same VO as v2)
 
-**Target:** ~2:45-3:10 Chatterbox cut. Hard stop 3:30. Absolute max 4:00.
-**Pin:** PR #17 / merge `269a695`. Live `/ui/` Demo scenarios, Fall signature button, upload-takes-minutes, reperceive, fall_cls demoted, n=11 / 18.0s, short AWS beat, Why I built this open.
-**Rules:** No Alexa. No em dashes. Fall frames stay blurred. Do not claim fall_cls ONNX decides. No YouTube / Devpost / Final Submit from this package.
+**Cut:** v3 re-shoot after Alexa/Nest UI scrub (main `4111ff1` / PR #19). Same approved Chatterbox VO as v2.
+**Duration:** ~144.87s · 1280×720 · H.264 + AAC
+**SHA-256:** `be6574fa73aabea30307124e76cbd506e5fbfd8f163be61c512e2874a71068e0`
+**Box path:** `/workspace/devpost-update/care-ladder-vision-v3.mp4`
+**Do not merge this PR to main as the sole gate for Devpost; Anoop holds Final Submit / YouTube.**
 
-Ax: grok peer ## CONSENSUS: APPROVE (autoclaw z.ai 401). Spoken word count ~313.
+---
 
 ## Shot list + VO (read verbatim)
 
