@@ -1,6 +1,6 @@
 household_id: demo-home-1
 caregiver:
-  display_name: Alex
+  display_name: Jamie
   phone_e164: "+12125550101"   # reserved fiction in demos
 secondary:
   display_name: Sam
@@ -27,9 +27,9 @@ rungs:
   - id: ask_ok
     tool: speaker_prompt
     params:
-      text: "Are you okay? Do you want me to call Alex?"
+      text: "Are you okay? Do you want me to call Jamie?"
       occlusion_text: "The camera looks covered. Could you clear the lens?"
-      channel: nest_or_alexa_then_phone
+      channel: smart_speaker_then_phone
   - id: wait_reply
     tool: wait
     params: { sec: 120 }

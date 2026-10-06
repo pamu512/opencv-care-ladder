@@ -96,6 +96,10 @@ def test_ui_setup_archive_and_family_chat_mirror():
     assert 'class="demo-strip"' in html
     assert "/family/runtime" in html
     assert "Alexa+" not in html
+    assert "Alexa" not in html
+    assert "Nest/Alexa-style" not in html
+    assert "call Alex" not in html
+    assert "\u2014" not in html  # no em dashes in /ui/ copy
 
 
 def test_family_runtime_is_honest_stub_without_token():
