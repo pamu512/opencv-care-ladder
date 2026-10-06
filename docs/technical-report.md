@@ -74,7 +74,7 @@ non-distress cues inside the window - suppression itself is audited.
 
 `python scripts/evaluate.py --dnn --json docs/eval-metrics.json`
 
-The harness is **n=10 cases**: synthetic fixtures plus three real-footage cases (one
+The harness is **n=11 cases**: synthetic fixtures plus three real-footage cases (one
 hard fall, one gradual collapse, one pedestrian negative). That is demo-scale evidence,
 not a clinical validation; failure modes are documented in
 [`failure-modes.md`](failure-modes.md) and the numbers below should be read with that
@@ -82,11 +82,11 @@ sample size in mind.
 
 | Metric | Result |
 | --- | --- |
-| Cue recall (positive cases) | 1.00 (7/7 on this n=10 set: still person, leaves zone, on-floor, real photo via DNN, **real fall clip**, post-fall stillness, pedestrians-exit) |
+| Cue recall (positive cases) | 1.00 (8/8 on this n=11 set: still person, leaves zone, on-floor, covered lens, real photo via DNN, **real fall clip**, post-fall stillness, pedestrians-exit) |
 | False-escalation rate (negative cases) | 0.00 (3/3: active person, pet motion, illumination ramp; pedestrian bend-overs held silent on real footage) |
-| Mean time-to-confirm | 20.5 s across cases (incl. real clips; synthetic-only cases ≈3 s; plan timeouts user-configured) |
+| Mean time-to-confirm | 18.0 s across cases (incl. real clips; synthetic-only cases ≈3 s; plan timeouts user-configured) |
 
-A perfect score on ten cases is a smoke test that every path still fires, not a
+A perfect score on eleven cases is a smoke test that every path still fires, not a
 sensitivity claim. Known failure modes (pets defeating stillness, lighting churn,
 blob-not-person) are enumerated in the failure-modes doc and encoded as the negative
 cases above.

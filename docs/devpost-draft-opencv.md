@@ -198,7 +198,7 @@ Privacy is enforced at attach: blur or silhouette runs **before** any pre-event 
 
 ## Accomplishments that we're proud of
 
-- Eval honesty first: the labeled harness is **n=10 cases** (synthetic fixtures + three real-footage cases: one hard fall, one gradual collapse, one pedestrian negative). On that small set the cues behaved as designed (recall 1.00, no false escalations, mean time-to-confirm 20.5 s incl. real clips); that is directional evidence at demo scale, not a clinical validation, and we say so on the timeline and in `docs/failure-modes.md`
+- Eval honesty first: the labeled harness is **n=11 cases** (synthetic fixtures including covered-lens occlusion, plus three real-footage cases: one hard fall, one gradual collapse, one pedestrian negative). On that small set the cues behaved as designed (recall 1.00, no false escalations, mean time-to-confirm 18.0 s incl. real clips); that is directional evidence at demo scale, not a clinical validation, and we say so on the timeline and in `docs/failure-modes.md`
 - Real KU Leuven fall re-enactment fires `distress_heuristic` / `sudden_vertical_to_horizontal`; gradual bed collapse escalates via stillness; OpenCV vtest pedestrians do not fire distress
 - Live HTTPS demo on AWS with privacy-only clips and a full audit timeline
 - Confirm-before-escalate UX that families can understand in one click (Path A / Path B fixtures)
