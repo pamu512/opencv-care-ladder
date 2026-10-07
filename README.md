@@ -5,9 +5,11 @@
 
 Agentic Vision care ladder for the **OpenCV AI Competition 2026** (Agentic Vision track).
 
-OpenCV cues drive a configurable **confirm → Nest/Alexa-style check-in → dial escalation** workflow, with privacy blur/silhouette, pre-event clips, and an incident timeline API for judges.
+OpenCV cues drive a configurable **confirm → smart-speaker check-in → dial escalation** workflow, with privacy blur/silhouette, pre-event clips, and an incident timeline API for judges.
 
 This is a **demo / simulator** stack: telephony is a stub dialer, the smart speaker is a scripted simulator, and there is **no live camera** on the demo path. It does **not** claim clinical diagnosis.
+
+Labeled harness tip: **n=11** cases (`docs/eval-metrics.json`) with cue recall 1.00, no false escalations, mean time-to-confirm **~18 s** (demo-scale, not clinical). `fall_cls` ONNX is demoted: not on the `/ui/` decision path (see section below).
 
 ## Setup
 
@@ -161,7 +163,7 @@ Expect ordered `events` with tools such as `cue` → `reperceive` → `speaker_p
 
 ## Demo care plan
 
-See `configs/demo_home.yaml`. Emergency rung is **disabled by default** (fail-closed). Phones are reserved fiction (`+1212555010x`). Speaker and dial channels are **simulators/stubs**, not live Nest/Alexa or carrier dial.
+See `configs/demo_home.yaml`. Emergency rung is **disabled by default** (fail-closed). Phones are reserved fiction (`+1212555010x`). Speaker and dial channels are **simulators/stubs**, not a live smart speaker or carrier dial.
 
 ## Tests
 
