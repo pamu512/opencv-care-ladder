@@ -23,7 +23,7 @@
     --font-body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
     --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
     --bg:#14110e; --surface:#1c1814; --surface-2:#241f1a; --inset:#100e0c;
-    --fg:#f4eee6; --muted:#b6ab9c; --faint:#7f7468;
+    --fg:#f4eee6; --muted:#b6ab9c; --faint:#91897f;
     --border:rgba(255,236,210,.08); --border-strong:rgba(255,236,210,.16);
     --accent:#2dd4e8; --accent-deep:#0e7490; --on-accent:#04161c;
     --ok:#34d399; --ok-dim:rgba(52,211,153,.14);
@@ -36,7 +36,7 @@
   }
   [data-theme="light"]{
     --bg:#f6f1ea; --surface:#fffdf9; --surface-2:#f3ebe1; --inset:#ebe3d8;
-    --fg:#2a2218; --muted:#5c5348; --faint:#7a7166;
+    --fg:#2a2218; --muted:#5c5348; --faint:#675f56;
     --border:rgba(16,24,38,.12); --border-strong:rgba(16,24,38,.22);
     --accent:#0e7490; --on-accent:#ffffff;
     --ok:#0f8a5f; --ok-dim:rgba(15,138,95,.10);
@@ -228,7 +228,7 @@
     background:var(--bad-dim)}
   .node.blocked .st{background:var(--bad-dim);color:var(--bad)}
   .node.blocked .top svg{color:var(--bad)}
-  .node.idle .card{opacity:.45}
+  .node.idle .card{opacity:.75}
   .node.idle .st{background:var(--surface-2);color:var(--faint)}
   .node.cue .card{border-color:color-mix(in srgb,var(--accent-deep) 60%,transparent)}
   .node.cue .name{color:var(--accent)}

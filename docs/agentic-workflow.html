@@ -7,7 +7,7 @@
 <style>
   body { background:#020617; color:#e2e8f0; font-family:'JetBrains Mono',monospace; margin:0; padding:24px; }
   h1 { font-size:18px; margin:0 0 4px; }
-  .sub { color:#64748b; font-size:11px; margin-bottom:16px; }
+  .sub { color:#94a3b8; font-size:11px; margin-bottom:16px; }
   .wrap { max-width:1200px; margin:0 auto; }
   .card { background:#0f172a; border:1px solid #1e293b; border-radius:12px; padding:12px; }
   svg { display:block; max-width:100%; height:auto; }
@@ -16,7 +16,7 @@
   .dot { width:8px; height:8px; border-radius:50%; }
   .cyan{background:#22d3ee}.emerald{background:#34d399}.amber{background:#fbbf24}
   .cards ul { margin:0; padding-left:14px; font-size:10px; color:#94a3b8; line-height:1.6;}
-  footer { color:#475569; font-size:10px; margin-top:16px; text-align:center; }
+  footer { color:#94a3b8; font-size:10px; margin-top:16px; text-align:center; }
 </style>
 </head>
 <body>
@@ -31,7 +31,7 @@
       <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
     </pattern>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
     </marker>
     <marker id="arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#22d3ee"/>
@@ -51,7 +51,7 @@
     <rect x="40" y="60" width="130" height="56" rx="6" fill="#0f172a"/>
     <rect x="40" y="60" width="130" height="56" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
     <text x="105" y="84" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">Camera frames</text>
-    <text x="105" y="98" fill="#64748b" font-size="8" text-anchor="middle">demo: photo / synthetic</text>
+    <text x="105" y="98" fill="#94a3b8" font-size="8" text-anchor="middle">demo: photo / synthetic</text>
   </g>
 
   <!-- DNN detector -->
@@ -59,8 +59,8 @@
     <rect x="210" y="60" width="130" height="56" rx="6" fill="#0f172a"/>
     <rect x="210" y="60" width="130" height="56" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
     <text x="275" y="78" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">Person detector</text>
-    <text x="275" y="90" fill="#64748b" font-size="8" text-anchor="middle">cv.dnn · ONNX</text>
-    <text x="275" y="101" fill="#64748b" font-size="8" text-anchor="middle">MediaPipe (Zoo)</text>
+    <text x="275" y="90" fill="#94a3b8" font-size="8" text-anchor="middle">cv.dnn · ONNX</text>
+    <text x="275" y="101" fill="#94a3b8" font-size="8" text-anchor="middle">MediaPipe (Zoo)</text>
   </g>
 
   <!-- BlazePose fall signature -->
@@ -68,8 +68,8 @@
     <rect x="380" y="60" width="130" height="56" rx="6" fill="#0f172a"/>
     <rect x="380" y="60" width="130" height="56" rx="6" fill="rgba(159,18,57,0.35)" stroke="#fb7185" stroke-width="1.5"/>
     <text x="445" y="78" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">Fall signature</text>
-    <text x="445" y="90" fill="#64748b" font-size="8" text-anchor="middle">BlazePose ONNX → torso/hip</text>
-    <text x="445" y="101" fill="#64748b" font-size="8" text-anchor="middle">sudden v→h = FALL</text>
+    <text x="445" y="90" fill="#94a3b8" font-size="8" text-anchor="middle">BlazePose ONNX → torso/hip</text>
+    <text x="445" y="101" fill="#94a3b8" font-size="8" text-anchor="middle">sudden v→h = FALL</text>
   </g>
 
   <!-- MOG2/contour -->
@@ -77,8 +77,8 @@
     <rect x="40" y="150" width="130" height="56" rx="6" fill="#0f172a"/>
     <rect x="40" y="150" width="130" height="56" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
     <text x="105" y="168" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">Motion</text>
-    <text x="105" y="180" fill="#64748b" font-size="8" text-anchor="middle">MOG2 bg-subtract</text>
-    <text x="105" y="191" fill="#64748b" font-size="8" text-anchor="middle">+ absdiff fallback</text>
+    <text x="105" y="180" fill="#94a3b8" font-size="8" text-anchor="middle">MOG2 bg-subtract</text>
+    <text x="105" y="191" fill="#94a3b8" font-size="8" text-anchor="middle">+ absdiff fallback</text>
   </g>
 
   <!-- zones -->
@@ -86,8 +86,8 @@
     <rect x="210" y="150" width="130" height="56" rx="6" fill="#0f172a"/>
     <rect x="210" y="150" width="130" height="56" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
     <text x="275" y="168" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">Zones / shape</text>
-    <text x="275" y="180" fill="#64748b" font-size="8" text-anchor="middle">Otsu + contours</text>
-    <text x="275" y="191" fill="#64748b" font-size="8" text-anchor="middle">pointPolygonTest</text>
+    <text x="275" y="180" fill="#94a3b8" font-size="8" text-anchor="middle">Otsu + contours</text>
+    <text x="275" y="191" fill="#94a3b8" font-size="8" text-anchor="middle">pointPolygonTest</text>
   </g>
 
   <line x1="340" y1="88" x2="380" y2="88" stroke="#fb7185" stroke-width="1.5" marker-end="url(#arrow-rose)"/>
@@ -99,7 +99,7 @@
     <rect x="60" y="250" width="250" height="64" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
     <text x="185" y="272" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">CueEvent</text>
     <text x="185" y="286" fill="#94a3b8" font-size="8" text-anchor="middle">no_movement · no_visibility · distress_heuristic</text>
-    <text x="185" y="298" fill="#64748b" font-size="8" text-anchor="middle">confidence + detector detail</text>
+    <text x="185" y="298" fill="#94a3b8" font-size="8" text-anchor="middle">confidence + detector detail</text>
   </g>
 
   <!-- privacy -->
@@ -108,7 +108,7 @@
     <rect x="60" y="350" width="250" height="64" rx="6" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1.5"/>
     <text x="185" y="372" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">Privacy transform</text>
     <text x="185" y="386" fill="#94a3b8" font-size="8" text-anchor="middle">blur / silhouette BEFORE persist</text>
-    <text x="185" y="398" fill="#64748b" font-size="8" text-anchor="middle">raw pixels never leave device path</text>
+    <text x="185" y="398" fill="#94a3b8" font-size="8" text-anchor="middle">raw pixels never leave device path</text>
   </g>
 
   <!-- DECISION boundary -->
@@ -120,7 +120,7 @@
     <rect x="410" y="60" width="320" height="60" rx="6" fill="#0f172a"/>
     <rect x="410" y="60" width="320" height="60" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
     <text x="570" y="82" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">run_incident orchestrator</text>
-    <text x="570" y="96" fill="#64748b" font-size="8" text-anchor="middle">cue kind + replies → next rung · jumps logged</text>
+    <text x="570" y="96" fill="#94a3b8" font-size="8" text-anchor="middle">cue kind + replies → next rung · jumps logged</text>
   </g>
 
   <!-- rungs -->
@@ -151,7 +151,7 @@
     <rect x="410" y="360" width="320" height="54" rx="6" fill="#0f172a"/>
     <rect x="410" y="360" width="320" height="54" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
     <text x="570" y="380" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">Audit trail</text>
-    <text x="570" y="394" fill="#64748b" font-size="8" text-anchor="middle">cue → rung → tool result → jump reason</text>
+    <text x="570" y="394" fill="#94a3b8" font-size="8" text-anchor="middle">cue → rung → tool result → jump reason</text>
   </g>
 
   <!-- ACTION boundary -->
@@ -162,31 +162,31 @@
     <rect x="810" y="60" width="290" height="54" rx="6" fill="#0f172a"/>
     <rect x="810" y="60" width="290" height="54" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
     <text x="955" y="80" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">ECS Fargate · X86_64 (live)</text>
-    <text x="955" y="94" fill="#64748b" font-size="8" text-anchor="middle">OpenCV 5 DNN + FastAPI · self-healing service</text>
+    <text x="955" y="94" fill="#94a3b8" font-size="8" text-anchor="middle">OpenCV 5 DNN + FastAPI · self-healing service</text>
   </g>
   <g>
     <rect x="810" y="140" width="135" height="54" rx="6" fill="#0f172a"/>
     <rect x="810" y="140" width="135" height="54" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
     <text x="877" y="162" fill="#e2e8f0" font-size="10" text-anchor="middle" font-weight="600">S3 clips</text>
-    <text x="877" y="176" fill="#64748b" font-size="8" text-anchor="middle">silhouette only</text>
+    <text x="877" y="176" fill="#94a3b8" font-size="8" text-anchor="middle">silhouette only</text>
   </g>
   <g>
     <rect x="965" y="140" width="135" height="54" rx="6" fill="#0f172a"/>
     <rect x="965" y="140" width="135" height="54" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
     <text x="1032" y="162" fill="#e2e8f0" font-size="10" text-anchor="middle" font-weight="600">EventBridge</text>
-    <text x="1032" y="176" fill="#64748b" font-size="8" text-anchor="middle">cue bus</text>
+    <text x="1032" y="176" fill="#94a3b8" font-size="8" text-anchor="middle">cue bus</text>
   </g>
   <g>
     <rect x="810" y="220" width="135" height="54" rx="6" fill="#0f172a"/>
     <rect x="810" y="220" width="135" height="54" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
     <text x="877" y="242" fill="#e2e8f0" font-size="10" text-anchor="middle" font-weight="600">ECR image</text>
-    <text x="877" y="256" fill="#64748b" font-size="8" text-anchor="middle">scan-on-push</text>
+    <text x="877" y="256" fill="#94a3b8" font-size="8" text-anchor="middle">scan-on-push</text>
   </g>
   <g>
     <rect x="965" y="220" width="135" height="54" rx="6" fill="#0f172a"/>
     <rect x="965" y="220" width="135" height="54" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
     <text x="1032" y="242" fill="#e2e8f0" font-size="10" text-anchor="middle" font-weight="600">CloudWatch</text>
-    <text x="1032" y="256" fill="#64748b" font-size="8" text-anchor="middle">logs · observability</text>
+    <text x="1032" y="256" fill="#94a3b8" font-size="8" text-anchor="middle">logs · observability</text>
   </g>
 
   <!-- caregiver console -->
@@ -195,7 +195,7 @@
     <rect x="810" y="300" width="290" height="64" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
     <text x="955" y="322" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">Caregiver console · /ui/</text>
     <text x="955" y="336" fill="#94a3b8" font-size="8" text-anchor="middle">incident timeline + pre-event clip viewer</text>
-    <text x="955" y="348" fill="#64748b" font-size="8" text-anchor="middle">one-click demo fixtures</text>
+    <text x="955" y="348" fill="#94a3b8" font-size="8" text-anchor="middle">one-click demo fixtures</text>
   </g>
 
   <!-- arrows -->
@@ -225,8 +225,8 @@
     <rect x="350" y="488" width="12" height="12" rx="3" fill="rgba(120,53,15,0.3)" stroke="#fbbf24"/><text x="368" y="498">action (AWS)</text>
     <rect x="490" y="488" width="12" height="12" rx="3" fill="rgba(76,29,149,0.4)" stroke="#a78bfa"/><text x="508" y="498">event / audit</text>
     <rect x="620" y="488" width="12" height="12" rx="3" fill="rgba(136,19,55,0.4)" stroke="#fb7185"/><text x="638" y="498">privacy / fail-closed</text>
-    <text x="30" y="530" fill="#64748b">Agentic Vision evidence: same cue → different actions by reply (Path A resolves with no dial; Path B escalates through dials); every jump audited with from_index → to_index + reason.</text>
-    <text x="30" y="548" fill="#475569">Eval (n=11 labeled cases, demo-scale): cue recall 1.00 · false-escalation 0.00 · mean time-to-confirm 18.0s incl. real clips - scripts/evaluate.py --dnn</text>
+    <text x="30" y="530" fill="#94a3b8">Agentic Vision evidence: same cue → different actions by reply (Path A resolves with no dial; Path B escalates through dials); every jump audited with from_index → to_index + reason.</text>
+    <text x="30" y="548" fill="#94a3b8">Eval (n=11 labeled cases, demo-scale): cue recall 1.00 · false-escalation 0.00 · mean time-to-confirm 18.0s incl. real clips - scripts/evaluate.py --dnn</text>
   </g>
 </svg>
   </div>
