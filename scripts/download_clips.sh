@@ -26,7 +26,7 @@ fetch() {
 # KU Leuven Advise fall-simulation dataset (research use, attributed in clips/README.md)
 fetch kul_fall_1.avi "https://iiw.kuleuven.be/onderzoek/advise/datasets/fall-1" 1000000
 fetch kul_fall_2.avi "https://iiw.kuleuven.be/onderzoek/advise/datasets/fall-2" 1000000
-# OpenCV sample (Apache-2.0) — pedestrians, negative control
+# OpenCV sample (Apache-2.0): pedestrians, negative control
 fetch vtest.avi "https://raw.githubusercontent.com/opencv/opencv/4.x/samples/data/vtest.avi" 1000000
 
 echo "clips ready in $CLIPS"

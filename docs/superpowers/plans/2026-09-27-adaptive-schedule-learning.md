@@ -1,4 +1,4 @@
-# Adaptive Schedule Learning — Implementation Plan
+# Adaptive Schedule Learning: Implementation Plan
 
 > **For Hermes:** TDD per task. Spec: `docs/superpowers/specs/2026-09-27-adaptive-schedule-learning.md`. Anoop (via Devt) asked for this on **all three** Care Ladder tracks: OpenCV main (CareCV), Amazon `amazon/alexa-plus-fire-tv`, Galuxium SaaS path on main.
 

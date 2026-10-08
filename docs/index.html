@@ -6,10 +6,10 @@
   <title>Care Ladder: Ask First, Escalate Last</title>
   <meta name="description" content="Care Ladder is an agentic senior-care escalation ladder for the OpenCV AI Competition 2026. OpenCV cues drive a confirm-before-escalate workflow: check in first, notify family second, dial last." />
   <!--
-    Direction C · "The Conversation" — transcript-led narrative variant.
+    Direction C · "The Conversation": transcript-led narrative variant.
     Same warm-editorial token family (bg #FAF7F2 / ink #1C1A17 / terracotta #C0512F / accent-ink #A8452A / forest #2F5B4F / muted text #756C63).
     V2: silhouette SVG viewBox widened; pressure tick added to transcript; cue list made count-safe with fifth detector path; em dashes cleaned from copy; neutral speaker wording.
-    Composition: the hero and core sections read as an incident transcript — speaker lines interleaved with system audit ticks.
+    Composition: the hero and core sections read as an incident transcript, speaker lines interleaved with system audit ticks.
     Fonts: Lora (display) · Figtree (body) · Space Mono (mono).
   -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,7 +21,7 @@
       --surface: #FFFFFF;
       --ink: #1C1A17;
       --accent: #C0512F;
-      --accent-ink: #A8452A;      /* terracotta text — AA 5.5:1 on paper */
+      --accent-ink: #A8452A;      /* terracotta text, AA 5.5:1 on paper */
       --forest: #2F5B4F;
       --muted: #756C63;
       --line: rgba(28, 26, 23, 0.12);
@@ -55,10 +55,10 @@
     h2 { line-height: 1.14; }
 
     /* ── header ── */
-    header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; }
+    header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; padding: 20px 0; gap: 12px; }
     .wordmark { font-family: var(--display); font-size: 22px; font-weight: 500; color: var(--ink); text-decoration: none; }
     .wordmark span { color: var(--accent); }
-    nav { display: flex; gap: 24px; align-items: center; }
+    nav { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
     nav a { color: var(--ink); text-decoration: none; font-size: 14px; font-weight: 500; }
     nav a:hover { color: var(--forest); }
     .nav-cta {
@@ -75,8 +75,8 @@
       text-decoration: none; border: 1px solid transparent;
       transition: opacity 120ms ease, background 120ms ease;
     }
-    .btn-primary { background: var(--accent); color: #FFF8F2; }
-    .btn-primary:hover { opacity: 0.9; }
+    .btn-primary { background: var(--accent); color: #ffffff; }
+    .btn-primary:hover { background: #a34428; }
     .btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
     .btn-ghost:hover { background: var(--surface); }
     .btn-link { background: none; border: none; color: var(--accent-ink); padding: 13px 0; font-weight: 600; text-decoration: none; }
@@ -137,7 +137,7 @@
     .def .d-desc { font-size: 14.5px; opacity: 0.78; line-height: 1.55; }
     .def .d-desc strong { font-weight: 600; opacity: 1; }
 
-    /* moments grid — asymmetric */
+    /* moments grid, asymmetric */
     .moments { display: grid; grid-template-columns: 1.25fr 1fr; gap: 20px; }
     .moment {
       background: var(--surface); border: 1px solid var(--line-soft); border-radius: 12px;
@@ -151,7 +151,7 @@
     .moment .m-list { list-style: none; margin-top: 10px; }
     .moment .m-list li { padding: 7px 0; font-size: 13.5px; opacity: 0.8; border-top: 1px solid var(--line-soft); }
     .moment .m-list li:first-child { border-top: none; }
-    .moment .m-list code { font-family: var(--mono); font-size: 11.5px; color: var(--forest); background: var(--bg); border: 1px solid var(--line-soft); border-radius: 5px; padding: 1px 6px; white-space: nowrap; }
+    .moment .m-list code { font-family: var(--mono); font-size: 11.5px; color: var(--forest); background: var(--bg); border: 1px solid var(--line-soft); border-radius: 5px; padding: 1px 6px; white-space: normal; overflow-wrap: anywhere; }
 
     /* privacy split */
     .privacy-band { background: var(--surface); border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
@@ -184,7 +184,7 @@
     .cmd-steps p { font-size: 14.5px; opacity: 0.75; }
     .cmd-steps code, .fx-card code {
       font-family: var(--mono); font-size: 12px; background: var(--surface);
-      border: 1px solid var(--line-soft); border-radius: 6px; padding: 2px 7px; white-space: nowrap;
+      border: 1px solid var(--line-soft); border-radius: 6px; padding: 2px 7px; white-space: normal; overflow-wrap: anywhere;
     }
     .fx-card { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 12px; padding: 26px; }
     .fx-card > h3 { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--forest); font-weight: 400; margin-bottom: 14px; }
@@ -206,7 +206,7 @@
     .closing h2 { font-size: clamp(34px, 4.4vw, 54px); letter-spacing: -0.02em; max-width: 22ch; margin: 0 auto 16px; }
     .closing h2 em { font-style: italic; opacity: 0.85; }
     .closing p { opacity: 0.72; max-width: 50ch; margin: 0 auto 34px; }
-    .closing .btn-primary { background: var(--accent); color: var(--bg); }
+    .closing .btn-primary { background: var(--accent); color: #ffffff; }
     .closing .btn-ghost { color: var(--bg); border-color: rgba(250, 247, 242, 0.26); }
     .closing .btn-ghost:hover { background: rgba(250, 247, 242, 0.08); }
     .closing .fine { margin-top: 24px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.5; }
@@ -273,38 +273,38 @@
       <div class="t-body">
         <div class="t-line system">
           <span class="t-time">14:02</span>
-          <div><span class="t-who">system · cue</span><p class="t-say">no_movement: stillness past timeout. Source: opencv_cue_detector. Privacy: silhouette.</p></div>
+          <div><span class="t-who">system · cue</span><p class="t-say">Incident opens on a fixture no_movement cue (detail: no_movement_silence). No camera frames attached. The routine profile adds a learning explain string to the cue detail.</p></div>
         </div>
         <div class="t-line system">
           <span class="t-time">14:02</span>
-          <div><span class="t-who">system · reperceive</span><p class="t-say">Re-check confirms the reading. Incident opens.</p></div>
+          <div><span class="t-who">system · reperceive</span><p class="t-say">Re-perceive result: stub_ok. This fixture passes no detector, so the rung does not replay a check.</p></div>
         </div>
         <div class="t-line speaker">
           <span class="t-time">14:03</span>
-          <div><span class="t-who">speaker · check-in</span><p class="t-say"><em>“Pat, are you okay?”</em></p></div>
+          <div><span class="t-who">speaker · check-in</span><p class="t-say"><em>“Are you okay? Do you want me to call Jamie?”</em></p></div>
         </div>
         <div class="t-line system">
           <span class="t-time">14:04</span>
-          <div><span class="t-who">system · wait</span><p class="t-say">Listen window closes. Silence: intent unclear, never invented into an OK.</p></div>
+          <div><span class="t-who">system · wait</span><p class="t-say">Speaker reply: silence, intent unclear. Wait rung jumped, reason listen_window_already_consumed.</p></div>
         </div>
         <div class="t-line family">
           <span class="t-time">14:04</span>
-          <div><span class="t-who">family · inform card</span><p class="t-say">Checking on Pat. Reply 1 to acknowledge · 2 for updates · 3 to call now.</p></div>
+          <div><span class="t-who">family · inform card</span><p class="t-say">Care Ladder · stillness cue. Pat did not answer the spoken check-in. You have 00:30 to decide. 1 · I'm on it - I'll call. 2 · Call Pat now (care ladder dial). 3 · Can't talk - continue to next contact.</p></div>
         </div>
         <div class="t-line system">
           <span class="t-time">14:05</span>
-          <div><span class="t-who">system · pressure</span><p class="t-say">No ack yet. The ladder holds at pressure, then moves to call.</p></div>
+          <div><span class="t-who">system · pressure</span><p class="t-say">Pressure: still no reply. 00:15 left before we call the next contact. No ack. Next bot state: calling_1.</p></div>
         </div>
         <div class="t-line system">
           <span class="t-time">14:06</span>
-          <div><span class="t-who">system · dial_contact</span><p class="t-say">Stub dial to caregiver Alex · +1 212 555 0101 (reserved fiction).</p></div>
+          <div><span class="t-who">system · dial_contact</span><p class="t-say">Stub dial to caregiver Jamie · +121****0101 (reserved fiction). No answer.</p></div>
         </div>
-        <div class="t-line family">
+        <div class="t-line system">
           <span class="t-time">14:07</span>
-          <div><span class="t-who">family · reply “1”</span><p class="t-say"><em>“I’ve got it from here.”</em></p></div>
+          <div><span class="t-who">system · dial_contact</span><p class="t-say">Stub dial to secondary Sam · +121****0102 (reserved fiction). Answered.</p></div>
         </div>
       </div>
-      <figcaption class="t-resolved">Resolved · caregiver_ack. Remaining rungs skipped, jumps logged</figcaption>
+      <figcaption class="t-resolved">Resolved · dial_answered: contact secondary (Sam) answered. The bot thread closes with that reason, then a routine_profile_update is logged.</figcaption>
     </figure>
   </section>
 </div>
@@ -413,7 +413,7 @@
           <rect x="8" y="18" width="64" height="80" rx="4" fill="#EDE7DD"/>
           <circle cx="40" cy="44" r="12" fill="#B7AC9C"/>
           <path d="M40 58 C 30 60, 26 70, 26 80 L 26 98 L 54 98 L 54 80 C 54 70, 50 60, 40 58 Z" fill="#B7AC9C"/>
-          <text x="40" y="112" text-anchor="middle" font-family="Space Mono, monospace" font-size="8" fill="#8A817A">raw</text>
+          <text x="40" y="112" text-anchor="middle" font-family="Space Mono, monospace" font-size="8" fill="#756C63">raw</text>
           <!-- arrow -->
           <path d="M84 58 h20 m-6 -5 l6 5 l-6 5" stroke="#8A817A" stroke-width="1.4" fill="none"/>
           <!-- blurred -->
@@ -421,7 +421,7 @@
           <circle cx="148" cy="44" r="12" fill="#C9C0B2"/>
           <circle cx="148" cy="44" r="12" fill="#B7AC9C" opacity="0.45"/>
           <path d="M148 58 C 138 60, 134 70, 134 80 L 134 98 L 162 98 L 162 80 C 162 70, 158 60, 148 58 Z" fill="#C9C0B2" opacity="0.7"/>
-          <text x="148" y="112" text-anchor="middle" font-family="Space Mono, monospace" font-size="8" fill="#8A817A">blur</text>
+          <text x="148" y="112" text-anchor="middle" font-family="Space Mono, monospace" font-size="8" fill="#756C63">blur</text>
           <!-- arrow -->
           <path d="M192 58 h20 m-6 -5 l6 5 l-6 5" stroke="#8A817A" stroke-width="1.4" fill="none"/>
           <!-- silhouette -->
@@ -429,7 +429,7 @@
             <rect x="0" y="18" width="64" height="80" rx="4" fill="#EDE7DD"/>
             <circle cx="32" cy="44" r="12" fill="#2F5B4F"/>
             <path d="M32 58 C 22 60, 18 70, 18 80 L 18 98 L 46 98 L 46 80 C 46 70, 42 60, 32 58 Z" fill="#2F5B4F"/>
-            <text x="32" y="112" text-anchor="middle" font-family="Space Mono, monospace" font-size="8" fill="#8A817A">silhouette</text>
+            <text x="32" y="112" text-anchor="middle" font-family="Space Mono, monospace" font-size="8" fill="#756C63">silhouette</text>
           </g>
           <text x="150" y="140" text-anchor="middle" font-family="Space Mono, monospace" font-size="8.5" fill="#2F5B4F" letter-spacing="1">privacy: “silhouette” on the audit cue</text>
         </svg>

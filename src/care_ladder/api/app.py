@@ -987,7 +987,7 @@ def create_app(store: AuditStore | None = None) -> FastAPI:
 
         Returns 202 immediately with a job id; the CPU-heavy decode+DNN scan
         runs in a worker thread (a 28 MB / 100+ s clip takes minutes on a
-        0.5-vCPU Fargate task — far past gateway timeouts — and would block
+        0.5-vCPU Fargate task, far past gateway timeouts, and would block
         the event loop if awaited inline). Poll GET /demo/upload/{job_id} for
         the resulting incident.
         """

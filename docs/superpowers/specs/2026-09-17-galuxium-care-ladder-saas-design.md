@@ -1,9 +1,9 @@
-# Care Ladder Hosted SaaS — Galuxium Nexus V2 Design Spec
+# Care Ladder Hosted SaaS: Galuxium Nexus V2 Design Spec
 
 **Date:** 2026-09-17  
-**Hackathon:** Galuxium Nexus V2 — [galuxium-nexus-v2-29411.devpost.com](https://galuxium-nexus-v2-29411.devpost.com/)  
+**Hackathon:** Galuxium Nexus V2: [galuxium-nexus-v2-29411.devpost.com](https://galuxium-nexus-v2-29411.devpost.com/)  
 **Deadline:** 2026-10-31 17:00 IST (~19:30 HKT)  
-**Approach lock:** A — Care Ladder hosted SaaS (not Tarka Hunt)  
+**Approach lock:** A: Care Ladder hosted SaaS (not Tarka Hunt)  
 **Related:** OpenCV Care Ladder product (`opencv-care-ladder`); RevenueCat Shipaton uses **ReadyPup**, not this filing.
 
 ## 1. Problem and buyer (approved)
@@ -115,7 +115,7 @@ Keep existing cue detector + privacy + orchestrator. Galuxium MVP may run **fixt
 | **Facility Growth** | $499/mo per site | 25 seats, 30d retention, priority support placeholder |
 
 - **Engine:** Stripe Checkout (subscription) + Customer Portal; webhook updates `tenant.plan` / `subscription_status`.  
-- **Metering (optional later):** per-incident overage — **out of Galuxium MVP** (YAGNI).  
+- **Metering (optional later):** per-incident overage: **out of Galuxium MVP** (YAGNI).  
 - Free **judge demo tenant** with fixture buttons, no card required.  
 - Document fiscal design in README + Devpost “Fiscal Architecture” section.
 
@@ -174,4 +174,4 @@ Same codebase may power OpenCV + Galuxium; packaging and claims differ.
 
 See authoritative cross-hackathon spec: `docs/superpowers/specs/2026-09-27-adaptive-schedule-learning.md`.
 
-Galuxium MVP may ship the JSON-backed `RoutineProfile` stub first; migrate to Postgres with tenancy. Learning is schedule baselines and adaptive timeouts only — not diagnosis. Rapid phase early, then settled. Fail-closed emergency unchanged.
+Galuxium MVP may ship the JSON-backed `RoutineProfile` stub first; migrate to Postgres with tenancy. Learning is schedule baselines and adaptive timeouts only, not diagnosis. Rapid phase early, then settled. Fail-closed emergency unchanged.
