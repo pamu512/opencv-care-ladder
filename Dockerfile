@@ -1,4 +1,4 @@
-# Care Ladder — runnable FastAPI + OpenCV image for local docker / ECS Fargate.
+# Care Ladder - runnable FastAPI + OpenCV image for local docker / ECS Fargate.
 # Demo entrypoint matches scripts/run_demo.sh: uvicorn care_ladder.api.app:app
 # Does not require AWS at runtime; cloud wiring is documented under infra/.
 

@@ -76,7 +76,7 @@ Before clips or caregiver views leave the device path, use:
 ## Reserved phones & emergency policy
 
 - Demo contacts use **NANP reserved fiction** numbers only: **NPA-555-01XX**  
-  (`+12125550101` caregiver Alex, `+12125550102` secondary Sam in `configs/demo_home.yaml`).
+  (`+12125550101` caregiver Jamie, `+12125550102` secondary Sam in `configs/demo_home.yaml`).
 - When `CARE_LADDER_ENV=demo` (default), `load_care_plan` **rejects** non-reserved and emergency-like phones (`911`, `112`, etc.).
 - **Never** configure or dial real 911 / real personal numbers in this repo.
 - Emergency rung is **disabled by default** (`enabled: false`) - fail-closed in plan and in code.

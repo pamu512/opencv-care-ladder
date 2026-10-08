@@ -273,38 +273,38 @@
       <div class="t-body">
         <div class="t-line system">
           <span class="t-time">14:02</span>
-          <div><span class="t-who">system · cue</span><p class="t-say">no_movement: stillness past timeout. Source: opencv_cue_detector. Privacy: silhouette.</p></div>
+          <div><span class="t-who">system · cue</span><p class="t-say">Incident opens on a fixture no_movement cue (detail: no_movement_silence). No camera frames attached. The routine profile adds a learning explain string to the cue detail.</p></div>
         </div>
         <div class="t-line system">
           <span class="t-time">14:02</span>
-          <div><span class="t-who">system · reperceive</span><p class="t-say">Re-check confirms the reading. Incident opens.</p></div>
+          <div><span class="t-who">system · reperceive</span><p class="t-say">Re-perceive result: stub_ok. This fixture passes no detector, so the rung does not replay a check.</p></div>
         </div>
         <div class="t-line speaker">
           <span class="t-time">14:03</span>
-          <div><span class="t-who">speaker · check-in</span><p class="t-say"><em>“Pat, are you okay?”</em></p></div>
+          <div><span class="t-who">speaker · check-in</span><p class="t-say"><em>“Are you okay? Do you want me to call Jamie?”</em></p></div>
         </div>
         <div class="t-line system">
           <span class="t-time">14:04</span>
-          <div><span class="t-who">system · wait</span><p class="t-say">Listen window closes. Silence: intent unclear, never invented into an OK.</p></div>
+          <div><span class="t-who">system · wait</span><p class="t-say">Speaker reply: silence, intent unclear. Wait rung jumped, reason listen_window_already_consumed.</p></div>
         </div>
         <div class="t-line family">
           <span class="t-time">14:04</span>
-          <div><span class="t-who">family · inform card</span><p class="t-say">Checking on Pat. Reply 1 to acknowledge · 2 for updates · 3 to call now.</p></div>
+          <div><span class="t-who">family · inform card</span><p class="t-say">Care Ladder · stillness cue. Pat did not answer the spoken check-in. You have 00:30 to decide. 1 · I'm on it - I'll call. 2 · Call Pat now (care ladder dial). 3 · Can't talk - continue to next contact.</p></div>
         </div>
         <div class="t-line system">
           <span class="t-time">14:05</span>
-          <div><span class="t-who">system · pressure</span><p class="t-say">No ack yet. The ladder holds at pressure, then moves to call.</p></div>
+          <div><span class="t-who">system · pressure</span><p class="t-say">Pressure: still no reply. 00:15 left before we call the next contact. No ack. Next bot state: calling_1.</p></div>
         </div>
         <div class="t-line system">
           <span class="t-time">14:06</span>
-          <div><span class="t-who">system · dial_contact</span><p class="t-say">Stub dial to caregiver Alex · +1 212 555 0101 (reserved fiction).</p></div>
+          <div><span class="t-who">system · dial_contact</span><p class="t-say">Stub dial to caregiver Jamie · +121****0101 (reserved fiction). No answer.</p></div>
         </div>
-        <div class="t-line family">
+        <div class="t-line system">
           <span class="t-time">14:07</span>
-          <div><span class="t-who">family · reply “1”</span><p class="t-say"><em>“I’ve got it from here.”</em></p></div>
+          <div><span class="t-who">system · dial_contact</span><p class="t-say">Stub dial to secondary Sam · +121****0102 (reserved fiction). Answered.</p></div>
         </div>
       </div>
-      <figcaption class="t-resolved">Resolved · caregiver_ack. Remaining rungs skipped, jumps logged</figcaption>
+      <figcaption class="t-resolved">Resolved · dial_answered: contact secondary (Sam) answered. The bot thread closes with that reason, then a routine_profile_update is logged.</figcaption>
     </figure>
   </section>
 </div>

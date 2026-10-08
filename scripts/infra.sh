@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Reproducible provisioning of the Care Ladder AWS demo stack (us-east-1).
 #
-# This script documents EXACTLY how the live stack was created — it is the
+# This script documents EXACTLY how the live stack was created: it is the
 # source of truth behind infra/README.md. It provisions:
 #   VPC bits (subnets/sg) → ECR repo → ECS cluster + Fargate service →
 #   ALB (internet-facing) → CloudFront HTTPS → DynamoDB table → task role

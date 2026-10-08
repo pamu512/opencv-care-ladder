@@ -248,7 +248,7 @@ def _seq_clip(name: str, fps: float, sample_hz: float, start_sec: float = 0.0):
         if not ok:
             break
         if i >= skip and (i - skip) % step == 0:
-            # timestamp in REAL seconds (source fps), not sample steps —
+            # timestamp in REAL seconds (source fps), not sample steps:
             # the pose state machine measures transition speed from these
             frames.append((f, (i - skip) / fps))
         i += 1
@@ -260,7 +260,7 @@ def summarize(results: list[dict]) -> dict:
     """Compute the grant-proposal metrics from per-case result dicts.
 
     Skipped cases (missing fixture/clip) are excluded from recall/FPR
-    denominators — a case that could not run is not a miss.
+    denominators: a case that could not run is not a miss.
     """
     ran = [r for r in results if not r.get("skipped")]
     expect_cue = [r for r in ran if r["expect_cue"] is not None]
