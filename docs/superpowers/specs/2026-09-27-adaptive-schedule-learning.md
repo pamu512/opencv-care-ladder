@@ -1,4 +1,4 @@
-# Adaptive Schedule Learning — Care Ladder (all hackathons)
+# Adaptive Schedule Learning: Care Ladder (all hackathons)
 
 **Date:** 2026-09-27  
 **Owner implementer:** Hermes  
@@ -40,7 +40,7 @@ RoutineProfile
   frozen: bool
   confirmed_ok_days: int
   settled_after_days: int   # default 10
-  # hour-of-day (0..23) buckets — counts of cue kinds and OK resolves
+  # hour-of-day (0..23) buckets: counts of cue kinds and OK resolves
   still_hour_hist: list[int]      # length 24
   leave_zone_hour_hist: list[int]
   ok_resolve_hour_hist: list[int]
@@ -52,7 +52,7 @@ RoutineProfile
 
 Persist:
 
-- **OpenCV main / Amazon (process-local):** JSON file under `data/routine_profiles/{subject_key}.json` (or audit-store sibling) — gitignore `data/`.
+- **OpenCV main / Amazon (process-local):** JSON file under `data/routine_profiles/{subject_key}.json` (or audit-store sibling). Gitignore `data/`.
 - **Galuxium SaaS:** Postgres table `routine_profiles` keyed by `tenant_id` (+ optional `monitored_id`); same fields. If SaaS tenancy not landed yet, use the JSON store and leave a clear TODO to migrate in Galuxium Task 1+.
 
 ## 5. Update rules (deterministic)
@@ -105,7 +105,7 @@ Galuxium facility console: same + optional admin “Freeze / Reset / Mark settle
 
 ## 8. Demo / filing story (shared VO beat)
 
-“First days the ladder learns fast — more check-ins while it maps the day. Once the schedule settles, it only escalates on real deviations, and every timeout stays explainable on the timeline.”
+“First days the ladder learns fast, with more check-ins while it maps the day. Once the schedule settles, it only escalates on real deviations, and every timeout stays explainable on the timeline.”
 
 Do **not** claim neural nets, clinical accuracy, or HIPAA.
 

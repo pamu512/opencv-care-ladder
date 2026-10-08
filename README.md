@@ -44,7 +44,7 @@ never touches rung order or the fail-closed emergency gate. See
    - `emergency` → **fail-closed** unless `params.enabled: true` (demo YAML keeps it `false`; even if enabled, code audits only and **never** places a real 911 call)
 3. **Branching from cue + replies** (what judges see in the timeline):
    - Speaker intent **`clear_ok`** (soft OK like “don’t worry”, or “I’m fine”) → resolve (no dial)
-   - Speaker intent **`needs_human`** (help / mixed hurt — never invents OK) → jump to notify / dial
+   - Speaker intent **`needs_human`** (help / mixed hurt: never invents OK) → jump to notify / dial
    - Speaker intent **`unclear`** (silence, groan) → continue down the ladder
    - Occlusion + silence → notify on **camera-health** basis, inform caretaker, **no distress claim**, no dial
    - Mid-ladder **Acknowledge** → resolve reason `caregiver_ack`, remaining rungs skipped
@@ -136,7 +136,7 @@ export TELEGRAM_CHAT_ID=...         # family chat
 export TELEGRAM_WEBHOOK_SECRET=...  # required once the token is set
 ```
 
-Webhook: `POST /telegram/webhook` (callback `ack:N` or text `1|2|3`). Unconfigured (no token): `200 {"ok":false,"reason":"telegram_not_configured"}` — the secret header is not required. When `TELEGRAM_BOT_TOKEN` is set, the handler checks `X-Telegram-Bot-Api-Secret-Token` against `TELEGRAM_WEBHOOK_SECRET` before applying an ack or enqueueing the update. A missing secret or a mismatch returns `200 {"ok":false,"applied":false,...}` and does not ack (fail closed, without a non-200 that would make Telegram retry). Vision still picks the next tools; Telegram is confirm-before-escalate, not a replacement for OpenCV cues.
+Webhook: `POST /telegram/webhook` (callback `ack:N` or text `1|2|3`). Unconfigured (no token): `200 {"ok":false,"reason":"telegram_not_configured"}`. The secret header is not required. When `TELEGRAM_BOT_TOKEN` is set, the handler checks `X-Telegram-Bot-Api-Secret-Token` against `TELEGRAM_WEBHOOK_SECRET` before applying an ack or enqueueing the update. A missing secret or a mismatch returns `200 {"ok":false,"applied":false,...}` and does not ack (fail closed, without a non-200 that would make Telegram retry). Vision still picks the next tools; Telegram is confirm-before-escalate, not a replacement for OpenCV cues.
 
 - **Path A: verbal OK** (`no_movement_ok`) - check-in clears, no dial.
 - **Path B: silence → escalate** (`no_movement_silence`) - notify then dial stubs, jumps logged.
