@@ -92,7 +92,7 @@ def test_ui_setup_archive_and_family_chat_mirror():
     assert "Setup + archive" in html
     assert "Family chat (mirror)" in html
     assert "Acknowledge" in html
-    assert 'class="demo-strip" open' not in html
+    assert 'id="demo-strip" open' in html
     assert 'class="demo-strip"' in html
     assert "/family/runtime" in html
     assert "Alexa+" not in html

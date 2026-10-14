@@ -6,10 +6,10 @@
   <title>Care Ladder: Ask First, Escalate Last</title>
   <meta name="description" content="Care Ladder is an agentic senior-care escalation ladder for the OpenCV AI Competition 2026. OpenCV cues drive a confirm-before-escalate workflow: check in first, notify family second, dial last." />
   <!--
-    Direction C · "The Conversation" — transcript-led narrative variant.
+    Direction C · "The Conversation": transcript-led narrative variant.
     Same warm-editorial token family (bg #FAF7F2 / ink #1C1A17 / terracotta #C0512F / accent-ink #A8452A / forest #2F5B4F / muted text #756C63).
     V2: silhouette SVG viewBox widened; pressure tick added to transcript; cue list made count-safe with fifth detector path; em dashes cleaned from copy; neutral speaker wording.
-    Composition: the hero and core sections read as an incident transcript — speaker lines interleaved with system audit ticks.
+    Composition: the hero and core sections read as an incident transcript, speaker lines interleaved with system audit ticks.
     Fonts: Lora (display) · Figtree (body) · Space Mono (mono).
   -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,7 +21,7 @@
       --surface: #FFFFFF;
       --ink: #1C1A17;
       --accent: #C0512F;
-      --accent-ink: #A8452A;      /* terracotta text — AA 5.5:1 on paper */
+      --accent-ink: #A8452A;      /* terracotta text, AA 5.5:1 on paper */
       --forest: #2F5B4F;
       --muted: #756C63;
       --line: rgba(28, 26, 23, 0.12);
@@ -137,7 +137,7 @@
     .def .d-desc { font-size: 14.5px; opacity: 0.78; line-height: 1.55; }
     .def .d-desc strong { font-weight: 600; opacity: 1; }
 
-    /* moments grid — asymmetric */
+    /* moments grid, asymmetric */
     .moments { display: grid; grid-template-columns: 1.25fr 1fr; gap: 20px; }
     .moment {
       background: var(--surface); border: 1px solid var(--line-soft); border-radius: 12px;
@@ -261,6 +261,7 @@
     <p class="lede dim">Built on OpenCV cues and a configurable ladder of rungs, every incident leaves a complete, ordered audit trail: what was seen, what was asked, who was told, and where it stopped.</p>
     <div class="hero-actions">
       <a class="btn btn-primary" href="https://d2u7pls4da2poz.cloudfront.net/ui/" target="_blank" rel="noopener">Try the live demo</a>
+      <a class="btn btn-ghost" href="https://www.youtube.com/watch?v=f0ttc5l0xBI" target="_blank" rel="noopener">Watch the demo</a>
       <a class="btn btn-ghost" href="https://github.com/pamu512/opencv-care-ladder" target="_blank" rel="noopener">Read the source</a>
     </div>
     <p class="hero-fine">Demo / simulator stack · no live camera · no clinical claims</p>
@@ -297,7 +298,7 @@
         </div>
         <div class="t-line system">
           <span class="t-time">14:06</span>
-          <div><span class="t-who">system · dial_contact</span><p class="t-say">Stub dial to caregiver Alex · +1 212 555 0101 (reserved fiction).</p></div>
+          <div><span class="t-who">system · dial_contact</span><p class="t-say">Stub dial to caregiver Jamie · +1 212 555 0101 (reserved fiction).</p></div>
         </div>
         <div class="t-line family">
           <span class="t-time">14:07</span>
