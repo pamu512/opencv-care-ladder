@@ -426,7 +426,7 @@
 
 <div class="consolebar">
   <section class="panel" aria-label="Demo scenarios">
-    <details class="demo-strip" id="demo-strip">
+    <details class="demo-strip" id="demo-strip" open>
     <summary>Demo scenarios</summary>
     <div class="triggers">
       <div class="tgroup">
@@ -1225,15 +1225,14 @@ async function refreshLearningBadge(){
 
 bindFixtures();
 refresh(true);
-// Cold start: a judge's first visit should not present a collapsed strip.
-// The seeded distress incident keeps the timeline non-empty; open the strip
-// so the guided Path A / Path B buttons are visible without hunting.
-(function openStripOnColdStart(){
+// Every load: Path A / Path B stay open above a long incident list.
+// cl-seen is recorded and must not collapse the strip for a return visit.
+(function openStripEveryLoad(){
   const strip = document.getElementById("demo-strip");
-  if (strip && !localStorage.getItem("cl-seen")){
-    strip.open = true;
-    localStorage.setItem("cl-seen","1");
-  }
+  if (!strip) return;
+  strip.open = true;
+  try { if (!localStorage.getItem("cl-seen")) localStorage.setItem("cl-seen","1"); }
+  catch { /* storage blocked: the open attribute still shows the strip */ }
 })();
 refreshLearningBadge();
 refreshFamilyMirror();
